@@ -42,7 +42,8 @@ export async function verifyLoginOtp(phone: string, code: string) {
   
   const supabase = await createClient()
   
-  const dummyEmail = `${phone.replace('+', '')}@tidkar.local`
+  const cleanPhoneForEmail = phone.replace(/\s+/g, '').replace('+', '');
+  const dummyEmail = `${cleanPhoneForEmail}@tidkar.local`;
   const dummyPassword = `${process.env.SUPABASE_DUMMY_PASSWORD || 'tidkar-dev-pass-2026'}`
 
   // Try to sign in

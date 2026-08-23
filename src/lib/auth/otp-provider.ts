@@ -147,7 +147,12 @@ export class OtpiqOtpProvider implements OtpProvider {
     try {
       const normalizedPhone = normalizeIraqiPhone(phone)
       
-      if (code.length !== 6 || !/^\d+$/.test(code)) {
+      const cleanCode = code
+        .trim()
+        .replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString())
+        .replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d).toString());
+
+      if (cleanCode.length !== 6 || !/^\d+$/.test(cleanCode)) {
         return { success: false, error: 'الرمز غير صحيح' }
       }
 
@@ -175,7 +180,7 @@ export class OtpiqOtpProvider implements OtpProvider {
       }
 
       // Hash the submitted code and perform constant-time comparison
-      const submittedHash = this.generateHash(code)
+      const submittedHash = this.generateHash(cleanCode)
       
       const isMatch = crypto.timingSafeEqual(
         Buffer.from(submittedHash, 'utf8'),
