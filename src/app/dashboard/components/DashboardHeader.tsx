@@ -1,12 +1,22 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { Bell, CheckCircle, XCircle, AlertCircle, Info } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { createClient } from '@/lib/supabase/client'
 
+export interface Notification {
+  id: string
+  type: string
+  title: string
+  message: string
+  created_at: string
+  is_read: boolean
+}
+
 export function DashboardHeader({ userName, phone, userId }: { userName: string, phone: string, userId: string }) {
-  const [notifications, setNotifications] = useState<any[]>([])
+  const [notifications, setNotifications] = useState<Notification[]>([])
   const [showDropdown, setShowDropdown] = useState(false)
   
   useEffect(() => {
@@ -18,7 +28,7 @@ export function DashboardHeader({ userName, phone, userId }: { userName: string,
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
         .limit(10)
-      if (data) setNotifications(data)
+      if (data) setNotifications(data as Notification[])
     }
     fetchNotifications()
   }, [userId, showDropdown])
@@ -28,15 +38,17 @@ export function DashboardHeader({ userName, phone, userId }: { userName: string,
   const markAllAsRead = async () => {
     if (unreadCount === 0) return
     const supabase = createClient()
-    await (supabase.from('notifications') as any).update({ is_read: true }).eq('user_id', userId).eq('is_read', false)
-    setNotifications(notifications.map((n: any) => ({ ...n, is_read: true })))
+    // @ts-expect-error - Supabase strict typing expects never for update when generated types are absent
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await supabase.from('notifications').update({ is_read: true } as any).eq('user_id', userId).eq('is_read', false)
+    setNotifications(notifications.map((n) => ({ ...n, is_read: true })))
   }
 
   return (
     <header className="bg-white border-b border-border sticky top-0 z-20">
       <div className="container mx-auto px-4 h-20 flex items-center justify-between max-w-6xl">
         <div className="flex items-center gap-6">
-          <a href="/" className="text-2xl font-bold text-[#A88952]">تِذكار</a>
+          <Link href="/" className="text-2xl font-bold text-[#A88952]">تِذكار</Link>
           <div className="hidden md:block w-px h-8 bg-border"></div>
           <h1 className="text-xl font-semibold hidden md:block">لوحة التحكم</h1>
         </div>

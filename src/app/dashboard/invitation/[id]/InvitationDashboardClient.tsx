@@ -5,7 +5,27 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Download, Share2, Copy, Search, CheckCircle, XCircle, HelpCircle, Users, Eye, ArrowUpRight } from 'lucide-react'
 
-export default function InvitationDashboardClient({ inv, rsvps, stats, isExpired }: { inv: any, rsvps: any[], stats: any, isExpired: boolean }) {
+type Rsvp = {
+  id: string;
+  guest_name: string;
+  status: string;
+  companions: number | null;
+  message: string | null;
+  created_at: string;
+}
+
+type InvitationStats = {
+  totalViews: number;
+  viewsToday: number;
+  viewsThisWeek: number;
+  viewsThisMonth: number;
+  confirmed: number;
+  maybe: number;
+  declined: number;
+  totalGuests: number;
+}
+
+export default function InvitationDashboardClient({ inv, rsvps, stats, isExpired }: { inv: Record<string, unknown>, rsvps: Rsvp[], stats: InvitationStats, isExpired: boolean }) {
   const [searchTerm, setSearchTerm] = useState('')
   const [filter, setFilter] = useState<'ALL' | 'CONFIRMED' | 'MAYBE' | 'DECLINED'>('ALL')
   
@@ -62,7 +82,7 @@ export default function InvitationDashboardClient({ inv, rsvps, stats, isExpired
       link.click()
       document.body.removeChild(link)
       window.URL.revokeObjectURL(url)
-    } catch (e) {
+    } catch {
       // Fallback
       window.open(qrUrl, '_blank')
     }
@@ -76,7 +96,7 @@ export default function InvitationDashboardClient({ inv, rsvps, stats, isExpired
         {/* URL & QR Card */}
         <div className="bg-white p-6 rounded-3xl border border-border shadow-sm flex flex-col items-center text-center lg:col-span-1">
           <div className="w-40 h-40 bg-gray-50 border border-gray-200 rounded-xl p-2 mb-6">
-            {/* Using img to avoid Next.js external domain config issues for api.qrserver.com */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={qrUrl} alt="QR Code" className="w-full h-full object-contain" />
           </div>
           
@@ -197,7 +217,7 @@ export default function InvitationDashboardClient({ inv, rsvps, stats, isExpired
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {filteredRsvps.map((rsvp: any) => (
+              {filteredRsvps.map((rsvp) => (
                 <tr key={rsvp.id} className="hover:bg-gray-50 transition-colors">
                   <td className="p-4 font-bold text-[#1C1C1C]">{rsvp.guest_name}</td>
                   <td className="p-4">
@@ -206,7 +226,7 @@ export default function InvitationDashboardClient({ inv, rsvps, stats, isExpired
                     {rsvp.status === 'DECLINED' && <span className="bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-bold">اعتذار</span>}
                   </td>
                   <td className="p-4 text-center font-bold text-lg">{rsvp.companions || 0}</td>
-                  <td className="p-4 text-sm text-muted-foreground max-w-xs truncate" title={rsvp.message}>{rsvp.message || '-'}</td>
+                  <td className="p-4 text-sm text-muted-foreground max-w-xs truncate" title={rsvp.message || undefined}>{rsvp.message || '-'}</td>
                   <td className="p-4 text-sm text-muted-foreground" dir="ltr">{new Date(rsvp.created_at).toLocaleString('en-GB')}</td>
                 </tr>
               ))}

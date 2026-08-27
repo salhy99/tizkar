@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import PreviewButton from "./PreviewButton";
 
 export default async function TemplateDetailPage({
   params,
@@ -10,13 +11,15 @@ export default async function TemplateDetailPage({
 }) {
   const p = await params;
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  await supabase.auth.getUser();
   
-  const { data: template } = (await supabase
+  const { data } = await supabase
     .from("templates")
     .select("*, event_types(*)")
     .eq("slug", p.slug)
-    .single()) as any;
+    .single();
+    
+  const template = data as { id: string; name: string; slug: string; description: string; base_price: number; is_featured: boolean; event_types: { name_ar: string } } | null;
 
   if (!template) {
     notFound();
@@ -77,7 +80,7 @@ export default async function TemplateDetailPage({
           {/* Details & Action */}
           <div className="space-y-8 sticky top-12">
             <div>
-              <div className="text-sm font-bold text-primary mb-2">{(template.event_types as any)?.name_ar}</div>
+              <div className="text-sm font-bold text-primary mb-2">{(template.event_types)?.name_ar}</div>
               <h1 className="text-4xl md:text-5xl font-bold mb-4">{template.name}</h1>
               <p className="text-xl text-muted-foreground leading-relaxed">
                 {template.description || "قالب أنيق وعصري مصمم بعناية ليجعل من مناسبتك ذكرى لا تُنسى."}
@@ -111,15 +114,13 @@ export default async function TemplateDetailPage({
             </div>
 
             <div className="flex flex-col gap-4 pt-4">
-              <Link href={user ? `/dashboard/create?template=${template.id}` : `/login?redirect=/dashboard/create?template=${template.id}`}>
+              <Link href={`/dashboard/create?template=${template.id}`}>
                 <Button size="lg" className="w-full h-14 text-lg bg-primary hover:bg-primary/90 text-white rounded-2xl shadow-xl shadow-primary/20">
                   استخدم هذا القالب
                 </Button>
               </Link>
               {/* Fake preview button just to satisfy Free Preview requirement loosely */}
-              <Button size="lg" variant="outline" className="w-full h-14 text-lg border-2" onClick={() => alert("في النسخة القادمة، سيتم فتح محرر المعاينة التجريبي هنا.")}>
-                جرّب القالب (معاينة مجانية)
-              </Button>
+              <PreviewButton />
             </div>
           </div>
 

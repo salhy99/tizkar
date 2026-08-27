@@ -5,39 +5,10 @@ import Countdown from './components/Countdown'
 import Gallery from './components/Gallery'
 import MusicPlayer from './components/MusicPlayer'
 
-export type InvitationData = {
-  groomName?: string;
-  brideName?: string;
-  quote?: string;
-  date?: string;
-  time?: string;
-  dateText?: string;
-  timeText?: string;
-  invitationText?: string;
-  parents?: {
-    groomFatherEnabled?: boolean;
-    groomFather?: string;
-    groomMotherEnabled?: boolean;
-    groomMother?: string;
-    brideFatherEnabled?: boolean;
-    brideFather?: string;
-    brideMotherEnabled?: boolean;
-    brideMother?: string;
-  };
-  venue?: {
-    name?: string;
-    address?: string;
-    url?: string;
-  };
-  program?: { id: string; time: string; title: string }[];
-  notes?: { id: string; text: string }[];
-  closing?: { text?: string; hashtag?: string };
-  contact?: { name?: string; whatsapp?: string };
-  gallery?: string[];
-  music?: { url?: string; type?: 'YOUTUBE' | 'MP3' };
-}
+import { TemplateRendererProps } from '../types'
 
-export function LayaliRenderer({ data, isPublicView = false, children }: { data: InvitationData, isPublicView?: boolean, children?: React.ReactNode }) {
+export function LayaliRenderer(props: TemplateRendererProps) {
+  const { data, children } = props
   // Default fallbacks for visual presentation if empty
   const groomName = data.groomName || 'العريس'
   const brideName = data.brideName || 'العروس'
@@ -77,7 +48,7 @@ export function LayaliRenderer({ data, isPublicView = false, children }: { data:
           <div className="w-16 h-px bg-[#A88952]/50"></div>
           
           <p className="text-xl leading-relaxed max-w-[280px] text-[#777777] italic">
-            "{quote}"
+            &ldquo;{quote}&rdquo;
           </p>
         </div>
       </section>
@@ -144,7 +115,7 @@ export function LayaliRenderer({ data, isPublicView = false, children }: { data:
         <section className="py-16 px-8 bg-[#FAF8F3]">
           <h2 className="text-2xl font-bold text-center text-[#A88952] mb-10">برنامج الحفل</h2>
           <div className="space-y-8 max-w-[300px] mx-auto relative before:absolute before:inset-0 before:ml-[1.2rem] before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-[#A88952]/30 before:to-transparent">
-            {data.program.map((item, i) => (
+            {data.program.map((item) => (
               <div key={item.id} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
                 <div className="flex items-center justify-center w-10 h-10 rounded-full border border-white bg-[#A88952]/10 text-[#A88952] shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10">
                   <div className="w-2 h-2 bg-[#A88952] rounded-full"></div>
@@ -174,8 +145,8 @@ export function LayaliRenderer({ data, isPublicView = false, children }: { data:
         </section>
       )}
 
-      {/* Render additional children (RSVP, Share, Story) only in Public View */}
-      {isPublicView && children}
+      {/* Render additional children (RSVP, Share, Story) */}
+      {children}
       
       {/* Footer / Closing */}
       <section className="py-20 px-8 text-center bg-[#A88952] text-white">

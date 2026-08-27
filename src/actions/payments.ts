@@ -1,172 +1,214 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
-import { revalidatePath } from 'next/cache'
+import { createClient as createServerClient } from '@/lib/supabase/server'
+import { createClient as createAdminClient } from '@supabase/supabase-js'
+import { requireInvitationEditAccess } from '@/lib/auth/invitation-auth'
 
-// Create a new order
-export async function createOrder(invitationId: string, planId: string) {
-  const supabase = await createClient()
-  
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Unauthorized' }
-
-  // 1. Validate invitation
-  const { data: inv } = await supabase
-    .from('invitations')
-    .select('id, user_id, status, title')
-    .eq('id', invitationId)
-    .single() as any;
-
-  if (!inv || inv.user_id !== user.id) return { error: 'الدعوة غير موجودة' }
-  if (inv.status === 'PUBLISHED') return { error: 'الدعوة منشورة بالفعل' }
-  if (inv.status === 'SUSPENDED') return { error: 'الدعوة موقوفة' }
-
-  // Check if invitation has required fields
-  const { data: activeVersion } = await supabase
-    .from('invitation_versions')
-    .select('invitation_data')
-    .eq('invitation_id', invitationId)
-    .eq('is_published', false)
-    .single() as any;
-
-  if (!activeVersion || !activeVersion.invitation_data) {
-    return { error: 'بيانات الدعوة غير مكتملة' }
-  }
-
-  const data = activeVersion.invitation_data;
-  if (!data.groomName || !data.brideName || !data.date || !data.time) {
-    return { error: 'أكمل البيانات الأساسية (الأسماء، التاريخ، الوقت) قبل المتابعة' }
-  }
-
-  // 2. Validate plan
-  const { data: plan } = await supabase
-    .from('plans')
-    .select('*')
-    .eq('id', planId)
-    .eq('status', 'ACTIVE')
-    .single() as any;
-
-  if (!plan || plan.price === 0) return { error: 'الباقة غير صالحة للنشر' }
-
-  // 3. Prevent duplicate active orders
-  const { data: existingOrders } = await supabase
-    .from('orders')
-    .select('id')
-    .eq('invitation_id', invitationId)
-    .in('status', ['PENDING_PAYMENT', 'PENDING_REVIEW']) as any;
-
-  if (existingOrders && existingOrders.length > 0) {
-    return { error: 'لديك طلب قيد الانتظار أو المراجعة بالفعل' }
-  }
-
-  // 4. Create Order
-  const planSnapshot = {
-    id: plan.id,
-    name: plan.name,
-    price: plan.price,
-    currency: plan.currency,
-    duration_days: plan.duration_days
-  };
-
-  const { data: order, error: orderError } = await (supabase.from('orders') as any)
-    .insert({
-      user_id: user.id,
-      invitation_id: invitationId,
-      plan_id: plan.id,
-      amount: plan.price,
-      currency: plan.currency,
-      status: 'PENDING_PAYMENT',
-      plan_snapshot: planSnapshot
-    })
-    .select()
-    .single();
-
-  if (orderError) {
-    console.error('Order Error:', orderError)
-    return { error: 'حدث خطأ أثناء إنشاء الطلب' }
-  }
-
-  // Update invitation status
-  await (supabase.from('invitations') as any)
-    .update({ status: 'PENDING_PAYMENT' })
-    .eq('id', invitationId);
-
-  return { success: true, orderId: order.id }
+function getAdminClient() {
+  return createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
 }
 
-// Submit payment reference
-export async function submitPayment(orderId: string, reference: string) {
-  const supabase = await createClient()
-  const ref = reference.trim();
-
-  if (!ref || ref.length > 50) return { error: 'رقم العملية غير صحيح' }
-
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Unauthorized' }
-
-  // Get order
-  const { data: order } = await supabase
-    .from('orders')
-    .select('id, user_id, status, invitation_id')
-    .eq('id', orderId)
-    .single() as any;
-
-  if (!order || order.user_id !== user.id) return { error: 'الطلب غير موجود' }
-  if (order.status !== 'PENDING_PAYMENT' && order.status !== 'REJECTED') {
-    return { error: 'لا يمكن إرسال دفعة لهذا الطلب' }
+function generateTrackingCode(): string {
+  const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // No O,0,I,1,L
+  let result = '';
+  for (let i = 0; i < 5; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
   }
-
-  // Verify reference isn't already used for an approved payment
-  // Requires service role since users can't read all payments
-  const { createClient: createAdmin } = await import('@supabase/supabase-js')
-  const adminClient = createAdmin(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
   
-  const { data: existingPayment } = await adminClient
-    .from('payments')
-    .select('id')
-    .eq('transaction_reference', ref)
-    .eq('status', 'APPROVED')
-    .single() as any;
+  const date = new Date();
+  const yy = String(date.getFullYear()).slice(-2);
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  
+  return `TZK-${yy}${mm}${dd}-${result}`;
+}
 
-  if (existingPayment) {
-    return { error: 'رقم العملية مستخدم مسبقاً' }
-  }
-
-  // Create payment record
-  const { error: paymentError } = await (supabase.from('payments') as any)
-    .insert({
-      order_id: orderId,
-      payment_method: 'KICARD',
-      transaction_reference: ref,
-      status: 'PENDING'
-    });
-
-  if (paymentError) {
-    // Handling duplicate reference via unique constraint on table
-    if (paymentError.code === '23505') {
-      return { error: 'رقم العملية مستخدم مسبقاً' }
+export async function createOrGetPaymentOrder(invitationId: string, planId: string) {
+  try {
+    // 1. Authorization
+    const authorizedInv = await requireInvitationEditAccess(invitationId)
+    if (!authorizedInv) {
+      return { success: false, error: 'Unauthorized' }
     }
-    return { error: 'حدث خطأ أثناء حفظ الدفعة' }
+
+    const adminClient = getAdminClient()
+
+    // 2. Validate Package / Plan
+    const { data: plan, error: planError } = await adminClient
+      .from('plans')
+      .select('*')
+      .eq('id', planId)
+      .eq('status', 'ACTIVE')
+      .single()
+
+    if (planError || !plan) {
+      return { success: false, error: 'Invalid or inactive plan' }
+    }
+
+    // 3. Check for existing PENDING_PAYMENT order for this invitation
+    // Note: We use Admin Client to ensure we can read all orders, since anon users 
+    // might not have RLS permission to read orders if we haven't updated RLS perfectly.
+    const { data: existingOrder } = await adminClient
+      .from('orders')
+      .select('id, tracking_code, amount, currency, status, plan_snapshot')
+      .eq('invitation_id', invitationId)
+      .eq('status', 'PENDING_PAYMENT')
+      .limit(1)
+      .single()
+
+    if (existingOrder) {
+      // 4. Handle Package Change
+      const snapshot = existingOrder.plan_snapshot;
+      if (snapshot?.id !== plan.id) {
+        // Cancel the old one safely and create a new one
+        await adminClient
+          .from('orders')
+          .update({ status: 'CANCELLED' })
+          .eq('id', existingOrder.id);
+        
+        // We will fall through to create a NEW order below
+      } else {
+        // If same plan, return existing
+        return {
+          success: true,
+          data: {
+            id: existingOrder.id,
+            trackingCode: existingOrder.tracking_code,
+            amount: existingOrder.amount,
+            currency: existingOrder.currency,
+            status: existingOrder.status,
+            packageName: snapshot?.name || plan.name
+          }
+        }
+      }
+    }
+
+    // 5. Create New Order (Collision retry loop)
+    let retries = 3;
+    while (retries > 0) {
+      try {
+        const trackingCode = generateTrackingCode();
+        
+        const { data: newOrder, error: insertError } = await adminClient
+          .from('orders')
+          .insert({
+            user_id: authorizedInv.user_id, // NULL for anonymous
+            invitation_id: invitationId,
+            plan_id: plan.id,
+            amount: plan.price,
+            currency: plan.currency,
+            status: 'PENDING_PAYMENT',
+            tracking_code: trackingCode,
+            payment_method: 'WHATSAPP_MANUAL',
+            plan_snapshot: plan
+          })
+          .select()
+          .single()
+          
+        if (insertError) {
+          if (insertError.code === '23505') { // Unique violation
+            retries--;
+            continue;
+          }
+          throw insertError;
+        }
+
+        return {
+          success: true,
+          data: {
+            id: newOrder.id,
+            trackingCode: newOrder.tracking_code,
+            amount: newOrder.amount,
+            currency: newOrder.currency,
+            status: newOrder.status,
+            packageName: plan.name
+          }
+        }
+
+      } catch (err) {
+        if (retries === 1) throw err;
+        retries--;
+      }
+    }
+
+    return { success: false, error: 'Failed to generate tracking code' }
+
+  } catch (err: unknown) {
+    console.error('Order creation error:', err)
+    return { success: false, error: err instanceof Error ? err.message : 'Internal server error' }
   }
+}
 
-  // Update order status
-  await (supabase.from('orders') as any)
-    .update({ status: 'PENDING_REVIEW' })
-    .eq('id', orderId);
+export async function checkPaymentStatus(orderId: string, invitationId: string) {
+  try {
+    const authorizedInv = await requireInvitationEditAccess(invitationId)
+    if (!authorizedInv) {
+      return { success: false, error: 'Unauthorized' }
+    }
 
-  // Update invitation status
-  await (supabase.from('invitations') as any)
-    .update({ status: 'PENDING_APPROVAL' })
-    .eq('id', order.invitation_id);
+    const adminClient = getAdminClient()
+    const { data: order, error } = await adminClient
+      .from('orders')
+      .select('status, tracking_code')
+      .eq('id', orderId)
+      .eq('invitation_id', invitationId)
+      .single()
 
-  // Send Notification
-  await adminClient.from('notifications').insert({
-    user_id: user.id,
-    type: 'PAYMENT_RECEIVED',
-    title: 'تم استلام الدفعة',
-    message: `تم استلام رقم العملية للطلب ${orderId.split('-')[0].toUpperCase()}. جاري مراجعتها من قبل الإدارة.`
-  } as any)
+    if (error || !order) {
+      return { success: false, error: 'Order not found' }
+    }
 
-  revalidatePath('/dashboard')
-  return { success: true }
+    return { success: true, status: order.status, trackingCode: order.tracking_code }
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : 'Unknown error' }
+  }
+}
+
+export async function adminConfirmManualPayment(orderId: string) {
+  try {
+    const supabase = await createServerClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) return { success: false, error: 'Unauthorized' }
+
+    const adminClient = getAdminClient()
+    const { data: profile } = await adminClient.from('profiles').select('role').eq('id', user.id).single()
+    if (!profile || !['ADMIN', 'SUPER_ADMIN'].includes(profile.role)) {
+      return { success: false, error: 'Unauthorized admin' }
+    }
+
+    const { data: order, error: orderError } = await adminClient
+      .from('orders')
+      .select('status, tracking_code')
+      .eq('id', orderId)
+      .single()
+
+    if (orderError || !order) return { success: false, error: 'Order not found' }
+    
+    if (order.status === 'PAID') {
+      return { success: true, message: 'Already paid' }
+    }
+
+    if (order.status !== 'PENDING_PAYMENT') {
+      return { success: false, error: 'Order is not pending payment' }
+    }
+
+    const { error: updateError } = await adminClient
+      .from('orders')
+      .update({
+        status: 'PAID',
+        paid_at: new Date().toISOString(),
+        approved_by: user.id
+      })
+      .eq('id', orderId)
+
+    if (updateError) throw updateError
+
+    return { success: true }
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : 'Unknown error' }
+  }
 }

@@ -52,7 +52,7 @@ function LoginContent() {
       } else {
         setError(res.error || 'حدث خطأ أثناء إرسال الرمز')
       }
-    } catch (err) {
+    } catch {
       setError('حدث خطأ غير متوقع')
     }
     setLoading(false)
@@ -78,7 +78,7 @@ function LoginContent() {
       } else {
         setError(res.error || 'رمز التحقق غير صحيح')
       }
-    } catch (err) {
+    } catch {
       setError('حدث خطأ غير متوقع')
     }
     setLoading(false)

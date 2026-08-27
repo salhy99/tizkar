@@ -3,38 +3,31 @@ import { redirect, notFound } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import PlanSelectionClient from './PlanSelectionClient'
 
+import { requireInvitationEditAccess } from '@/lib/auth/invitation-auth'
+
 export default async function PlansPage({ params }: { params: Promise<{ invitationId: string }> }) {
   const p = await params
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect('/login')
-  }
-
-  // Verify invitation ownership and completeness
-  const { data: inv } = await supabase
-    .from('invitations')
-    .select('id, user_id, status, title')
-    .eq('id', p.invitationId)
-    .single() as any;
-
-  if (!inv || inv.user_id !== user.id) {
+  
+  const authorizedInv = await requireInvitationEditAccess(p.invitationId)
+  if (!authorizedInv) {
     notFound()
   }
 
-  if (inv.status !== 'DRAFT') {
+  if (authorizedInv.status !== 'DRAFT') {
     // If already pending or published, redirect to dashboard or order status
     redirect('/dashboard')
   }
 
-  const { data: activeVersion } = await supabase
+  const supabase = await createClient()
+
+  const { data: activeVersionRaw } = await supabase
     .from('invitation_versions')
     .select('invitation_data')
     .eq('invitation_id', p.invitationId)
     .eq('is_published', false)
-    .single() as any;
+    .single();
 
+  const activeVersion = activeVersionRaw as { invitation_data?: { groomName?: string, brideName?: string, date?: string, time?: string } } | null;
   const data = activeVersion?.invitation_data || {};
   const isComplete = data.groomName && data.brideName && data.date && data.time;
 
@@ -58,7 +51,7 @@ export default async function PlansPage({ params }: { params: Promise<{ invitati
     .from('plans')
     .select('*')
     .eq('status', 'ACTIVE')
-    .order('display_order', { ascending: true }) as any;
+    .order('display_order', { ascending: true });
 
   return (
     <div className="min-h-screen bg-[#FAF8F3] py-16 px-4" dir="rtl">

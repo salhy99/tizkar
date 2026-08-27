@@ -1,5 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
-import AdminInvitationsClient from './AdminInvitationsClient'
+import AdminInvitationsClient, { AdminInvitation } from './AdminInvitationsClient'
 
 export default async function AdminInvitationsPage() {
   const { createClient: createAdmin } = await import('@supabase/supabase-js')
@@ -19,16 +18,12 @@ export default async function AdminInvitationsPage() {
       profiles:user_id ( display_name, phone )
     `)
     .order('created_at', { ascending: false })
-    .limit(100) as any;
+    .limit(100);
 
   return (
-    <div className="p-8 max-w-6xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-[#1C1C1C]">إدارة الدعوات</h1>
-        <p className="text-muted-foreground mt-2">عرض جميع دعوات المنصة وإيقاف الدعوات المخالفة</p>
-      </div>
-
-      <AdminInvitationsClient invitations={invitations || []} />
+    <div className="container mx-auto p-4 md:p-8 max-w-6xl">
+      <h1 className="text-2xl font-bold mb-8 text-[#1C1C1C]">إدارة الدعوات</h1>
+      <AdminInvitationsClient invitations={invitations as unknown as AdminInvitation[]} />
     </div>
   )
 }

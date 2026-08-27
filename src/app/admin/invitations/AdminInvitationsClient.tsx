@@ -7,7 +7,16 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 
-export default function AdminInvitationsClient({ invitations }: { invitations: any[] }) {
+export type AdminInvitation = {
+  id: string;
+  title: string | null;
+  slug: string;
+  status: string;
+  created_at: string;
+  profiles: { display_name: string | null; phone: string | null } | null;
+}
+
+export default function AdminInvitationsClient({ invitations }: { invitations: AdminInvitation[] }) {
   const router = useRouter()
   const [searchTerm, setSearchTerm] = useState('')
   const [suspendId, setSuspendId] = useState<string | null>(null)
@@ -68,9 +77,9 @@ export default function AdminInvitationsClient({ invitations }: { invitations: a
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {filtered.map((inv: any) => (
+              {filtered.map((inv) => (
                 <tr key={inv.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="p-4 font-bold text-[#1C1C1C] truncate max-w-[200px]" title={inv.title}>{inv.title}</td>
+                  <td className="p-4 font-bold text-[#1C1C1C] truncate max-w-[200px]" title={inv.title || undefined}>{inv.title}</td>
                   <td className="p-4">
                     <div className="font-bold">{inv.profiles?.display_name || 'بدون اسم'}</div>
                     <div className="text-xs text-muted-foreground" dir="ltr">{inv.profiles?.phone}</div>

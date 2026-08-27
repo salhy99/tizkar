@@ -102,9 +102,9 @@ export default function MusicUploader({ invitationId, music, onChange }: MusicUp
       setStatus('SUCCESS')
       onChange({ url: confirmRes.path, type: 'MP3' })
 
-    } catch (err: any) {
+    } catch (err: unknown) {
       setStatus('ERROR')
-      setErrorMsg(err.message)
+      setErrorMsg(err instanceof Error ? err.message : 'حدث خطأ')
     }
   }
 

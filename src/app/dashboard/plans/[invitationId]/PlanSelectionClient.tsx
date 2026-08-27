@@ -2,27 +2,38 @@
 
 import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createOrder } from '@/actions/payments'
+import { createOrGetPaymentOrder } from '@/actions/payments'
 import { Button } from '@/components/ui/button'
 
-export default function PlanSelectionClient({ invitationId, plans }: { invitationId: string, plans: any[] }) {
+type Plan = {
+  id: string;
+  name: string;
+  description: string | null;
+  price: number;
+  currency: string;
+  duration_days: number;
+  features: Record<string, unknown>;
+  status: string;
+}
+
+export default function PlanSelectionClient({ invitationId, plans }: { invitationId: string, plans: Plan[] }) {
   const router = useRouter()
   const [loadingId, setLoadingId] = useState<string | null>(null)
   const [error, setError] = useState('')
 
-  const handleSelectPlan = async (plan: any) => {
+  const handleSelectPlan = async (plan: Plan) => {
     if (plan.price === 0) {
       alert('تم استخدام هذه الباقة للمعاينة مسبقاً في المحرر.')
       return
     }
 
-    setLoadingId(plan.id)
+    setLoadingId(plan.id as string)
     setError('')
     
-    const res = await createOrder(invitationId, plan.id)
+    const res = await createOrGetPaymentOrder(invitationId, plan.id)
     
-    if (res.success && res.orderId) {
-      router.push(`/dashboard/payment/${res.orderId}`)
+    if (res.success && res.data?.id) {
+      router.push(`/dashboard/payment/${res.data.id}?invitationId=${invitationId}`)
     } else {
       setError(res.error || 'حدث خطأ غير متوقع')
       setLoadingId(null)

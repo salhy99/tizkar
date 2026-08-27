@@ -1,8 +1,9 @@
 import { getPublicInvitation } from '@/actions/publicInvitation'
-import { LayaliRenderer } from '@/components/templates/layali'
+import { TemplateRenderer } from '@/components/templates/TemplateRenderer'
 import { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import PublicLayout from './components/PublicLayout'
+import RsvpForm from '@/components/rsvp/RsvpForm'
 
 export const revalidate = 1800; // 30 minutes. Ensures Signed URLs (60 mins expiry) never expire while cached.
 
@@ -20,8 +21,10 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
   const { groomName, brideName } = res.data.data
   const title = `دعوة زفاف ${groomName || 'العريس'} و${brideName || 'العروس'} | تِذكار`
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
   return {
+    metadataBase: new URL(baseUrl),
     title,
     description: res.data.data.quote || 'دعوتكم لمشاركتنا فرحتنا ❤️',
     robots: 'noindex, nofollow', // Ensure it doesn't get indexed by search engines
@@ -65,7 +68,9 @@ export default async function PublicInvitationPage({ params }: { params: Promise
 
   return (
     <PublicLayout data={res.data.data} invitationId={res.data.id}>
-      <LayaliRenderer data={res.data.data} isPublicView={true} />
+      <TemplateRenderer templateSlug={res.data.templateSlug} data={res.data.data} mode="public">
+        <RsvpForm invitationId={res.data.id} />
+      </TemplateRenderer>
     </PublicLayout>
   )
 }

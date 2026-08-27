@@ -11,17 +11,21 @@ export default async function InvitationDashboardPage({ params }: { params: Prom
 
   if (!user) redirect("/login");
 
-  const { data: profile } = await supabase
+  const { data: profileRaw } = await supabase
     .from("profiles")
     .select("*")
     .eq("id", user.id)
-    .single() as any;
+    .single();
+    
+  const profile = profileRaw as { display_name: string | null } | null;
 
-  const { data: inv } = await supabase
-    .from("invitations")
-    .select("*, event_types(*), templates(*)")
-    .eq("id", p.id)
-    .single() as any;
+  const { data: invRaw } = await supabase
+    .from('invitations')
+    .select('*, event_types(*), templates(*)')
+    .eq('id', p.id)
+    .single();
+
+  const inv = invRaw as { id: string; user_id: string; slug: string; title: string; status: string; expires_at: string | null; story_image_url: string | null; profiles: { display_name: string } | null; event_types: Record<string, unknown>; templates: Record<string, unknown> } | null;
 
   if (!inv || inv.user_id !== user.id) notFound();
 
@@ -38,13 +42,13 @@ export default async function InvitationDashboardPage({ params }: { params: Prom
     .from("rsvp_responses")
     .select("*")
     .eq("invitation_id", inv.id)
-    .order("created_at", { ascending: false }) as any;
+    .order("created_at", { ascending: false });
 
   // Fetch Views Analytics
   const { data: views } = await supabase
     .from("invitation_views")
     .select("viewed_at")
-    .eq("invitation_id", inv.id) as any;
+    .eq("invitation_id", inv.id);
 
   const totalViews = views?.length || 0;
   
@@ -58,20 +62,27 @@ export default async function InvitationDashboardPage({ params }: { params: Prom
   const monthAgo = new Date();
   monthAgo.setMonth(monthAgo.getMonth() - 1);
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const viewsToday = views?.filter((v: any) => new Date(v.viewed_at) >= today).length || 0;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const viewsThisWeek = views?.filter((v: any) => new Date(v.viewed_at) >= weekAgo).length || 0;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const viewsThisMonth = views?.filter((v: any) => new Date(v.viewed_at) >= monthAgo).length || 0;
 
   // RSVP Stats
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const confirmed = rsvps?.filter((r: any) => r.status === 'CONFIRMED') || [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const maybe = rsvps?.filter((r: any) => r.status === 'MAYBE') || [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const declined = rsvps?.filter((r: any) => r.status === 'DECLINED') || [];
   
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const totalGuests = confirmed.reduce((acc: number, curr: any) => acc + 1 + (curr.companions || 0), 0);
 
   return (
     <main className="min-h-screen bg-[#FAF8F3]" dir="rtl">
-      <DashboardHeader userName={profile?.display_name || user.phone} phone={user.phone!} userId={user.id} />
+      <DashboardHeader userName={profile?.display_name || user.phone || ""} phone={user.phone!} userId={user.id} />
 
       <div className="container mx-auto px-4 py-8 max-w-6xl">
         <div className="mb-8">
@@ -107,7 +118,7 @@ export default async function InvitationDashboardPage({ params }: { params: Prom
             declined: declined.length,
             totalGuests
           }}
-          isExpired={isExpired}
+          isExpired={!!isExpired}
         />
       </div>
     </main>

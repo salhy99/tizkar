@@ -2,64 +2,41 @@
 
 import React, { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { updateInvitationData, updateInvitationTitle } from '@/actions/invitations'
+import { updateInvitationData, updateInvitationTitle, publishInvitationOwner } from '@/actions/invitations'
+import { getTemplate } from '@/components/templates/registry'
 import { PhoneFrame } from '@/components/ui/phone-frame'
-import { LayaliRenderer, InvitationData } from '@/components/templates/layali'
+import { TemplateRenderer } from '@/components/templates/TemplateRenderer'
+import { InvitationData } from '@/components/templates/types'
 import { Button } from '@/components/ui/button'
 import Sidebar from './Sidebar'
 
 export default function EditorClient({ 
   invitationId, 
   initialTitle, 
-  initialData 
+  initialData,
+  invitationStatus,
+  paymentOrder,
+  hasRecoveryKey,
+  templateSlug
 }: { 
   invitationId: string, 
   initialTitle: string, 
-  initialData: InvitationData 
+  initialData: InvitationData,
+  invitationStatus: string,
+  paymentOrder: { id: string, status: string } | null,
+  hasRecoveryKey: boolean,
+  templateSlug: string
 }) {
   const router = useRouter()
   const [data, setData] = useState<InvitationData>(initialData)
   const [title, setTitle] = useState(initialTitle)
   const [saveStatus, setSaveStatus] = useState<'IDLE' | 'SAVING' | 'SAVED' | 'ERROR'>('IDLE')
-  
-  // Track mobile view mode (editor vs preview)
+  const [publishing, setPublishing] = useState(false)
   const [mobileMode, setMobileMode] = useState<'EDITOR' | 'PREVIEW'>('EDITOR')
-
-  // Debounced auto-save for data
-  useEffect(() => {
-    const handler = setTimeout(async () => {
-      // Don't save if it hasn't really changed from initial (basic check) or if we just loaded
-      // In a real app we'd deep compare, but for now we just save if it's not IDLE
-      if (saveStatus !== 'IDLE') {
-        setSaveStatus('SAVING')
-        const res = await updateInvitationData(invitationId, data)
-        if (res.success) {
-          setSaveStatus('SAVED')
-          setTimeout(() => setSaveStatus('IDLE'), 2000)
-        } else {
-          setSaveStatus('ERROR')
-        }
-      }
-    }, 1000)
-
-    return () => clearTimeout(handler)
-  }, [data])
-
-  const handleDataChange = useCallback((newData: InvitationData) => {
-    setData(newData)
-    setSaveStatus('SAVING') // Trigger effect
-  }, [])
-
-  const handleTitleChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newTitle = e.target.value
-    setTitle(newTitle)
-    // Save title immediately (or debounce it too)
-    await updateInvitationTitle(invitationId, newTitle)
-  }
 
   // Calculate completion percentage
   const calcCompletion = () => {
-    let total = 4;
+    const total = 4;
     let completed = 0;
     if (data.groomName) completed++;
     if (data.brideName) completed++;
@@ -69,6 +46,88 @@ export default function EditorClient({
   }
 
   const completion = calcCompletion()
+
+  const handlePublish = async () => {
+    if (completion < 100) {
+      alert('يرجى إكمال البيانات الأساسية قبل النشر.')
+      return
+    }
+    
+    setPublishing(true)
+    const res = await publishInvitationOwner(invitationId)
+    if (res.success) {
+      alert('تم نشر الدعوة بنجاح!')
+      router.push('/dashboard')
+    } else {
+      alert(res.error || 'حدث خطأ أثناء النشر')
+      setPublishing(false)
+    }
+  }
+
+  const handleContinue = () => {
+    if (completion < 100) {
+      alert('يرجى إكمال البيانات الأساسية أولاً.')
+      return
+    }
+    if (paymentOrder?.status === 'PENDING_PAYMENT') {
+      router.push(`/dashboard/payment/${paymentOrder.id}?invitationId=${invitationId}`)
+    } else {
+      router.push(`/dashboard/plans/${invitationId}`)
+    }
+  }
+
+  // Robust serialized autosave
+  const pendingDataRef = React.useRef<InvitationData | null>(null)
+  const isSavingRef = React.useRef(false)
+
+  const performSave = useCallback(async function performSaveFn(dataToSave: InvitationData) {
+    isSavingRef.current = true
+    setSaveStatus('SAVING')
+    
+    const res = await updateInvitationData(invitationId, dataToSave)
+    
+    if (res.success) {
+      setSaveStatus('SAVED')
+      setTimeout(() => setSaveStatus('IDLE'), 2000)
+    } else {
+      setSaveStatus('ERROR')
+    }
+
+    isSavingRef.current = false
+    
+    // If more changes happened while we were saving, save again immediately
+    if (pendingDataRef.current) {
+      const nextData = pendingDataRef.current
+      pendingDataRef.current = null
+      performSaveFn(nextData)
+    }
+  }, [invitationId])
+
+  useEffect(() => {
+    if (saveStatus === 'SAVING') {
+      if (isSavingRef.current) {
+        pendingDataRef.current = data
+        return
+      }
+
+      const handler = setTimeout(() => {
+        performSave(data)
+      }, 1000)
+      
+      return () => clearTimeout(handler)
+    }
+  }, [data, saveStatus, performSave])
+
+  const handleDataChange = useCallback((newData: InvitationData) => {
+    setData(newData)
+    setSaveStatus('SAVING') // This tells the UI we have unsaved/saving changes
+  }, [])
+
+  const handleTitleChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newTitle = e.target.value
+    setTitle(newTitle)
+    await updateInvitationTitle(invitationId, newTitle)
+  }
 
   return (
     <div className="flex flex-col h-screen w-full bg-[#FAF8F3]">
@@ -92,15 +151,39 @@ export default function EditorClient({
           <div className="text-sm hidden md:block text-muted-foreground">
             {saveStatus === 'SAVING' && 'جاري الحفظ...'}
             {saveStatus === 'SAVED' && 'تم الحفظ ✓'}
-            {saveStatus === 'ERROR' && <span className="text-destructive">تعذر الحفظ</span>}
+            {saveStatus === 'ERROR' && (
+              <div className="flex items-center gap-2 text-destructive">
+                <span>تعذر الحفظ</span>
+                <Button variant="link" className="p-0 h-auto text-destructive text-sm" onClick={() => performSave(data)}>إعادة المحاولة</Button>
+              </div>
+            )}
           </div>
           
-          <Button variant="outline" className="hidden lg:flex" onClick={() => alert('معاينة عامة (Phase 3)')}>
-            معاينة
-          </Button>
-          <Button className="bg-primary text-white hover:bg-primary/90" onClick={() => alert('نظام اختيار الباقات والدفع سيتم تطبيقه في المرحلة الرابعة (Phase 4)')}>
-            متابعة
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" className="hidden lg:flex" onClick={() => router.push(`/editor/${invitationId}/guests`)}>
+              سجل الحضور
+            </Button>
+            <Button variant="outline" className="hidden lg:flex" onClick={() => window.open(`/api/preview/${invitationId}`, '_blank')}>
+              معاينة
+            </Button>
+          </div>
+          
+          {invitationStatus === 'PUBLISHED' ? (
+            <div className="flex items-center gap-2">
+              <span className="hidden md:inline-block text-green-600 font-bold px-4 py-2 bg-green-50 rounded-lg">الدعوة منشورة ✓</span>
+              <Button className="bg-primary text-white hover:bg-primary/90 font-bold" onClick={() => router.push(`/editor/${invitationId}/share`)}>
+                مشاركة الدعوة
+              </Button>
+            </div>
+          ) : paymentOrder?.status === 'PAID' ? (
+            <Button className="bg-green-600 text-white hover:bg-green-700" onClick={handlePublish} disabled={publishing}>
+              {publishing ? 'جاري النشر...' : 'نشر الدعوة الآن'}
+            </Button>
+          ) : (
+            <Button className="bg-primary text-white hover:bg-primary/90" onClick={handleContinue}>
+              {paymentOrder?.status === 'PENDING_PAYMENT' ? 'متابعة الدفع' : 'اختيار الباقة'}
+            </Button>
+          )}
         </div>
       </header>
 
@@ -149,7 +232,7 @@ export default function EditorClient({
           </div>
           
           <div className="flex-1 overflow-y-auto custom-scrollbar p-4">
-            <Sidebar invitationId={invitationId} data={data} onChange={handleDataChange} />
+            <Sidebar invitationId={invitationId} data={data} onChange={handleDataChange} hasRecoveryKey={hasRecoveryKey} features={getTemplate(templateSlug)?.features || { gallery: true, map: true, program: true, parents: true, music: true, rsvp: true }} />
           </div>
         </aside>
 
@@ -160,7 +243,27 @@ export default function EditorClient({
         `}>
           <div className="lg:h-full lg:w-full flex items-center justify-center">
             <PhoneFrame>
-              <LayaliRenderer data={data} />
+              <TemplateRenderer templateSlug={templateSlug} data={data} mode="editor-preview">
+                <div className="py-12 px-6 sm:px-8 text-center bg-white border-t border-[#A88952]/20 opacity-80 pointer-events-none relative" dir="rtl">
+                  <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-xs px-3 py-1 rounded-full font-bold shadow-lg">
+                    معاينة قسم تأكيد الحضور
+                  </div>
+                  <h3 className="text-2xl font-bold text-[#A88952] mb-6 mt-4">هل ستشاركنا فرحتنا؟</h3>
+                  <div className="space-y-6 text-right opacity-50 grayscale">
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold text-[#777777]">الاسم الكريم</label>
+                      <div className="h-12 border-2 border-border rounded-xl bg-gray-50"></div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="h-12 rounded-xl border-2 border-[#A88952] bg-[#A88952]/10 text-[#A88952] flex items-center justify-center font-bold text-sm">سأحضر بالتأكيد</div>
+                      <div className="h-12 rounded-xl border-2 border-border flex items-center justify-center font-bold text-sm">أعتذر عن الحضور</div>
+                    </div>
+                    <div className="h-14 bg-[#A88952] text-white flex items-center justify-center font-bold text-lg rounded-xl mt-4">
+                      تأكيد الرد
+                    </div>
+                  </div>
+                </div>
+              </TemplateRenderer>
             </PhoneFrame>
           </div>
         </main>

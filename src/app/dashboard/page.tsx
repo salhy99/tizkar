@@ -3,7 +3,14 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { DashboardHeader } from "./components/DashboardHeader";
-import { BarChart3, Users, Calendar, Eye, Clock, QrCode } from "lucide-react";
+import { BarChart3, Calendar, Eye, Clock } from "lucide-react";
+
+export const metadata = {
+  robots: {
+    index: false,
+    follow: false,
+  },
+};
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -13,24 +20,26 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
-  const { data: profile } = await supabase
+  const { data: profileRaw } = await supabase
     .from("profiles")
     .select("*")
     .eq("id", user.id)
-    .single() as any;
+    .single();
+
+  const profile = profileRaw as { display_name: string | null } | null;
 
   // Fetch invitations
   const { data: invitations } = await supabase
     .from("invitations")
     .select("*, event_types(*), templates(*)")
     .eq("user_id", user.id)
-    .order("created_at", { ascending: false }) as any;
+    .order("created_at", { ascending: false });
 
   const { data: orders } = await supabase
     .from("orders")
     .select("id, invitation_id, status")
     .eq("user_id", user.id)
-    .order("created_at", { ascending: false }) as any;
+    .order("created_at", { ascending: false });
 
   // Derive stats
   const totalInvs = invitations?.length || 0;
@@ -42,6 +51,7 @@ export default async function DashboardPage() {
   let pendingCount = 0;
   let expiredCount = 0;
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- complex supabase data
   const enrichedInvitations = invitations?.map((inv: any) => {
     let effectiveStatus = inv.status;
     if (inv.status === 'PUBLISHED' && inv.expires_at && new Date(inv.expires_at) < now) {
@@ -57,7 +67,7 @@ export default async function DashboardPage() {
 
   return (
     <main className="min-h-screen bg-[#FAF8F3]" dir="rtl">
-      <DashboardHeader userName={profile?.display_name || user.phone} phone={user.phone!} userId={user.id} />
+      <DashboardHeader userName={profile?.display_name || user.phone || ""} phone={user.phone!} userId={user.id} />
 
       <div className="container mx-auto px-4 py-12 max-w-6xl">
         <div className="flex flex-col md:flex-row justify-between items-center mb-8">
@@ -109,13 +119,15 @@ export default async function DashboardPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- complex supabase data */}
               {enrichedInvitations.map((inv: any) => {
-                const invOrders = orders?.filter((o: any) => o.invitation_id === inv.id) || [];
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any -- complex supabase data
+                const invOrders = (orders as any[] || []).filter((o: Record<string, unknown>) => o.invitation_id === inv.id);
                 const latestOrder = invOrders[0];
                 const status = inv.effectiveStatus;
 
                 return (
-                  <div key={inv.id} className="bg-white rounded-3xl p-6 border border-border shadow-sm flex flex-col h-full hover:shadow-md transition-shadow">
+                  <div key={inv.id as string} className="bg-white rounded-3xl p-6 border border-border shadow-sm flex flex-col h-full hover:shadow-md transition-shadow">
                     <div className="flex justify-between items-start mb-4">
                       <div className="bg-[#FAF8F3] text-[#A88952] text-xs font-bold px-3 py-1 rounded-full border border-[#A88952]/20">
                         {inv.event_types?.name_ar}

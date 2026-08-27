@@ -1,6 +1,11 @@
-import { createClient } from '@/lib/supabase/server'
-import Link from 'next/link'
-import { Button } from '@/components/ui/button'
+type AdminUser = {
+  id: string;
+  display_name: string | null;
+  phone: string | null;
+  role: string;
+  created_at: string;
+  invitations: { id: string; status: string }[] | null;
+}
 
 export default async function AdminUsersPage() {
   const { createClient: createAdmin } = await import('@supabase/supabase-js')
@@ -20,7 +25,7 @@ export default async function AdminUsersPage() {
       invitations ( id, status )
     `)
     .order('created_at', { ascending: false })
-    .limit(100) as any;
+    .limit(100);
 
   return (
     <div className="p-8 max-w-6xl mx-auto">
@@ -42,7 +47,7 @@ export default async function AdminUsersPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {users && users.map((u: any) => (
+              {users && (users as AdminUser[]).map((u) => (
                 <tr key={u.id} className="hover:bg-gray-50 transition-colors">
                   <td className="p-4 font-bold text-[#1C1C1C]">{u.display_name || 'بدون اسم'}</td>
                   <td className="p-4 font-mono text-sm" dir="ltr">{u.phone || 'غير متوفر'}</td>

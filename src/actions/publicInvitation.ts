@@ -1,23 +1,27 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { InvitationData } from '@/components/templates/layali'
+import { InvitationData } from '@/components/templates/types'
 
 export type PublicInvitationDTO = {
   id: string;
   title: string;
   data: InvitationData;
   templateVersion: string;
-  theme?: any;
+  templateSlug: string;
+  theme?: Record<string, unknown>;
 }
 
-function isValidStoragePath(path: string, userId: string, invId: string) {
+function isValidStoragePath(path: string, userId: string | null, invId: string) {
   if (!path || typeof path !== 'string') return false;
   if (path.includes('..') || path.startsWith('/') || path.includes('?') || path.includes('#') || path.includes('\\')) return false;
   
   const segments = path.split('/');
   if (segments.length !== 3) return false;
-  if (segments[0] !== userId) return false;
+  
+  const allowedPrefix = userId || 'anon';
+  if (segments[0] !== allowedPrefix) return false;
+  
   if (segments[1] !== invId) return false;
   
   const filename = segments[2];
@@ -38,7 +42,7 @@ export async function getPublicInvitation(slug: string): Promise<{ data?: Public
   const supabase = await createClient()
 
   // Find published invitation by slug
-  const { data: inv, error: invError } = await supabase
+  const { data: invRaw, error: invError } = await supabase
     .from('invitations')
     .select(`
       id,
@@ -46,6 +50,9 @@ export async function getPublicInvitation(slug: string): Promise<{ data?: Public
       title,
       status,
       expires_at,
+      templates (
+        slug
+      ),
       invitation_versions!inner (
         is_published,
         invitation_data,
@@ -54,7 +61,17 @@ export async function getPublicInvitation(slug: string): Promise<{ data?: Public
     `)
     .eq('slug', slug)
     .eq('status', 'PUBLISHED')
-    .single() as any;
+    .single();
+
+  const inv = invRaw as {
+    id: string;
+    user_id: string;
+    title: string;
+    status: string;
+    expires_at: string | null;
+    templates: { slug: string } | null;
+    invitation_versions: { is_published: boolean; invitation_data: InvitationData; template_version_id: string }[];
+  } | null;
 
   if (invError || !inv) {
     return { error: 'NOT_FOUND' }
@@ -66,7 +83,7 @@ export async function getPublicInvitation(slug: string): Promise<{ data?: Public
   }
 
   // Find the published version
-  const publishedVersion = inv.invitation_versions?.find((v: any) => v.is_published)
+  const publishedVersion = inv.invitation_versions?.find((v) => v.is_published)
   
   if (!publishedVersion) {
     return { error: 'NOT_PUBLISHED_VERSION' }
@@ -80,7 +97,7 @@ export async function getPublicInvitation(slug: string): Promise<{ data?: Public
   )
   
   // Log view anonymously (non-blocking)
-  adminAuthClient.from('invitation_views').insert({ invitation_id: inv.id } as any).then(() => {})
+  adminAuthClient.from('invitation_views').insert({ invitation_id: inv.id }).then(() => {})
 
   const invData = publishedVersion.invitation_data as InvitationData;
   const pathsToSign: string[] = [];
@@ -138,7 +155,8 @@ export async function getPublicInvitation(slug: string): Promise<{ data?: Public
       id: inv.id,
       title: inv.title,
       data: safeData,
-      templateVersion: publishedVersion.template_version_id
+      templateVersion: publishedVersion.template_version_id,
+      templateSlug: inv.templates?.slug || 'layali'
     }
   }
 }
@@ -161,11 +179,13 @@ export async function submitRSVP(invitationId: string, payload: {
   const supabase = await createClient()
 
   // 1. Verify invitation is published and not expired
-  const { data: inv, error: invError } = await supabase
+  const { data: invRaw, error: invError } = await supabase
     .from('invitations')
     .select('status, expires_at')
     .eq('id', invitationId)
-    .single() as any;
+    .single();
+
+  const inv = invRaw as { status: string; expires_at: string | null } | null;
 
   if (invError || !inv) {
     return { error: 'الدعوة غير موجودة' }
@@ -200,7 +220,7 @@ export async function submitRSVP(invitationId: string, payload: {
     .select('id')
     .eq('invitation_id', invitationId)
     .eq('guest_name', payload.name)
-    .gte('created_at', fiveMinutesAgo) as any;
+    .gte('created_at', fiveMinutesAgo);
 
   if (recentSubmissions && recentSubmissions.length > 0) {
     return { error: 'لقد قمت بإرسال رد مسبقاً مؤخراً. يرجى المحاولة لاحقاً.' }
@@ -214,7 +234,7 @@ export async function submitRSVP(invitationId: string, payload: {
       companions: payload.companions,
       status: payload.status,
       message: safeMessage
-    } as any)
+    })
 
   if (error) {
     console.error('RSVP Error', error)

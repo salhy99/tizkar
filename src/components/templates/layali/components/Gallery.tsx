@@ -1,7 +1,4 @@
-'use client'
-
 import React, { useState } from 'react'
-import Image from 'next/image'
 
 export default function Gallery({ images }: { images: string[] }) {
   const [lightboxOpen, setLightboxOpen] = useState(false)
@@ -26,6 +23,7 @@ export default function Gallery({ images }: { images: string[] }) {
           <div key={i} className="relative aspect-[3/4] overflow-hidden rounded-xl cursor-pointer shadow-sm border border-[#A88952]/20" onClick={() => openLightbox(i)}>
             {/* For Phase 3, we just use standard img, but Next Image is required for optimization.
                 Since URLs might be external or from Supabase storage, unoptimized=true might be needed if no domains are configured, but for a real app we'd configure next.config.ts */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={src} alt={`صورة ${i + 1}`} className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" loading="lazy" />
           </div>
         ))}
@@ -44,6 +42,7 @@ export default function Gallery({ images }: { images: string[] }) {
           )}
 
           <div className="relative w-full max-w-[90vw] max-h-[80vh] aspect-auto">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={images[currentIndex]} alt={`صورة ${currentIndex + 1}`} className="max-w-full max-h-[80vh] object-contain mx-auto" />
           </div>
 

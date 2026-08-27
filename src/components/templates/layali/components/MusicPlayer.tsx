@@ -1,12 +1,11 @@
 'use client'
 
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useRef } from 'react'
 
 export default function MusicPlayer({ url, type }: { url?: string, type?: 'YOUTUBE' | 'MP3' }) {
   const [isPlaying, setIsPlaying] = useState(false)
   const [hasInteracted, setHasInteracted] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
-  const [ytPlayerReady, setYtPlayerReady] = useState(false)
   const iframeRef = useRef<HTMLIFrameElement>(null)
 
   if (!url) return null

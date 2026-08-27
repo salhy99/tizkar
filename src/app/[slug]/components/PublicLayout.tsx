@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
-import { InvitationData } from '@/components/templates/layali'
+import { InvitationData } from '@/components/templates/types'
 import { submitRSVP } from '@/actions/publicInvitation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -179,7 +179,7 @@ export default function PublicLayout({
       <div className="w-full max-w-[480px] bg-white min-h-screen shadow-2xl relative overflow-x-hidden">
         {/* We use React.cloneElement to pass the rsvpAndShare as children if children is LayaliRenderer */}
         {React.isValidElement(children) 
-          ? React.cloneElement(children as React.ReactElement<any>, { children: rsvpAndShare })
+          ? React.cloneElement(children as React.ReactElement<{ children?: React.ReactNode }>, { children: rsvpAndShare })
           : children}
       </div>
     </div>

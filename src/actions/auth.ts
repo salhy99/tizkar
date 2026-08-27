@@ -2,7 +2,6 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { otpProvider } from '@/lib/auth/otp-provider'
-import { cookies } from 'next/headers'
 
 export async function sendLoginOtp(phone: string) {
   // In a real implementation with custom SMS provider:
@@ -47,7 +46,7 @@ export async function verifyLoginOtp(phone: string, code: string) {
   const dummyPassword = `${process.env.SUPABASE_DUMMY_PASSWORD || 'tidkar-dev-pass-2026'}`
 
   // Try to sign in
-  let { error, data } = await supabase.auth.signInWithPassword({
+  const { error } = await supabase.auth.signInWithPassword({
     email: dummyEmail,
     password: dummyPassword,
   })
@@ -70,12 +69,13 @@ export async function verifyLoginOtp(phone: string, code: string) {
     
     // Create profile
     if (signupRes.data.user) {
-      const { error: profileError } = await supabase.from('profiles').insert({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error: profileError } = await (supabase.from('profiles') as any).insert({
         id: signupRes.data.user.id,
         phone: phone,
         display_name: 'مستخدم تذكار',
         role: 'USER'
-      } as any)
+      })
       if (profileError) {
         console.error('Error creating profile', profileError)
       }

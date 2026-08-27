@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
@@ -10,11 +11,13 @@ async function getAdminClient() {
   if (!user) return null
 
   // Verify role
-  const { data: profile } = await supabase
+  const { data: profileRaw } = await supabase
     .from('profiles')
     .select('role')
     .eq('id', user.id)
-    .single() as any;
+    .single();
+
+  const profile = profileRaw as { role: string } | null;
 
   if (!profile || !['ADMIN', 'SUPER_ADMIN'].includes(profile.role)) {
     return null
@@ -246,3 +249,52 @@ export async function suspendInvitation(invitationId: string, reason: string) {
   revalidatePath('/admin/invitations')
   return { success: true }
 }
+
+export async function adminRotateInvitationCredentials(invitationId: string) {
+  const adminCtx = await getAdminClient()
+  if (!adminCtx) return { error: 'Unauthorized' }
+  const { adminAuthClient, adminId } = adminCtx
+
+  const { data: inv } = await adminAuthClient
+    .from('invitations')
+    .select('id, user_id, status, title')
+    .eq('id', invitationId)
+    .single() as any;
+
+  if (!inv) return { error: 'Invitation not found' }
+
+  const { generateEditToken, hashEditToken, generateRecoveryKey, hashRecoveryKey } = await import('@/lib/auth/editor-session');
+  
+  const newEditToken = generateEditToken();
+  const newEditTokenHash = hashEditToken(newEditToken);
+  
+  const newRecoveryKey = generateRecoveryKey();
+  const newRecoveryKeyHash = hashRecoveryKey(newRecoveryKey);
+
+  const { error } = await adminAuthClient
+    .from('invitations')
+    .update({ 
+      edit_token_hash: newEditTokenHash,
+      recovery_key_hash: newRecoveryKeyHash,
+      last_recovered_at: new Date().toISOString()
+    })
+    .eq('id', invitationId) as any;
+
+  if (error) return { error: 'فشل إصدار بيانات جديدة' }
+
+  await (adminAuthClient.from('admin_logs') as any)
+    .insert({
+      admin_id: adminId,
+      action: 'ADMIN_RECOVERY',
+      entity_type: 'INVITATION',
+      entity_id: invitationId,
+      metadata: { reason: 'Admin assisted recovery requested by user' }
+    });
+
+  return { 
+    success: true, 
+    newEditToken, 
+    newRecoveryKey 
+  }
+}
+

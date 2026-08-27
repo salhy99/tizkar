@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { createMediaUploadToken, confirmMediaUpload } from '@/actions/storage'
 import { Button } from '@/components/ui/button'
 
@@ -26,7 +26,6 @@ const MAX_CONCURRENT = 2
 
 export default function GalleryUploader({ invitationId, gallery, onChange }: GalleryUploaderProps) {
   const [queue, setQueue] = useState<UploadItem[]>([])
-  const [isProcessing, setIsProcessing] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Cleanup Blob URLs when unmounting or removing items
@@ -76,6 +75,10 @@ export default function GalleryUploader({ invitationId, gallery, onChange }: Gal
     setQueue(prev => [...prev, ...newItems])
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
+
+  const updateItem = useCallback((id: string, updates: Partial<UploadItem>) => {
+    setQueue(prev => prev.map(item => item.id === id ? { ...item, ...updates } : item))
+  }, [])
 
   // Process Queue
   useEffect(() => {
@@ -130,17 +133,14 @@ export default function GalleryUploader({ invitationId, gallery, onChange }: Gal
         updateItem(nextItem.id, { status: 'SUCCESS', path: confirmRes.path })
         onChange([...gallery, confirmRes.path])
 
-      } catch (err: any) {
-        updateItem(nextItem.id, { status: 'ERROR', errorMsg: err.message })
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'حدث خطأ'
+        updateItem(nextItem.id, { status: 'ERROR', errorMsg: msg })
       }
     }
 
     processQueue()
-  }, [queue, invitationId, gallery, onChange])
-
-  const updateItem = (id: string, updates: Partial<UploadItem>) => {
-    setQueue(prev => prev.map(item => item.id === id ? { ...item, ...updates } : item))
-  }
+  }, [queue, invitationId, gallery, onChange, updateItem])
 
   const handleRemoveExisting = (pathToRemove: string) => {
     onChange(gallery.filter(p => p !== pathToRemove))
@@ -196,6 +196,7 @@ export default function GalleryUploader({ invitationId, gallery, onChange }: Gal
         {/* Uploading/New Queue Images */}
         {queue.map(item => (
           <div key={item.id} className="relative aspect-square bg-muted rounded-md border border-border overflow-hidden">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={item.previewUrl} className="object-cover w-full h-full opacity-50" alt="Preview" />
             
             <div className="absolute inset-0 flex flex-col items-center justify-center p-2 bg-black/40 text-white text-xs text-center font-bold">
