@@ -61,7 +61,8 @@ export default async function PlansPage({ params }: { params: Promise<{ invitati
           <p className="text-lg text-muted-foreground">قم بترقية مسودتك لتصبح دعوة فعلية قابلة للمشاركة.</p>
         </div>
         
-        <PlanSelectionClient invitationId={p.invitationId} plans={plans || []} />
+        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+        <PlanSelectionClient invitationId={p.invitationId} plans={(plans as any) || []} />
       </div>
     </div>
   )

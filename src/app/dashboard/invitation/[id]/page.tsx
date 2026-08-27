@@ -107,7 +107,8 @@ export default async function InvitationDashboardPage({ params }: { params: Prom
 
         <InvitationDashboardClient 
           inv={inv} 
-          rsvps={rsvps || []}
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          rsvps={(rsvps as any) || []}
           stats={{
             totalViews,
             viewsToday,

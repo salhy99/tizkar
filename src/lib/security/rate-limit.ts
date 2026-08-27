@@ -6,6 +6,7 @@ let redis: Redis | null = null;
 let creationLimiter: Ratelimit | null = null;
 let recoveryLimiter: Ratelimit | null = null;
 let rsvpLimiter: Ratelimit | null = null;
+let analyticsLimiter: Ratelimit | null = null;
 
 try {
   if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
@@ -36,6 +37,15 @@ try {
       limiter: Ratelimit.slidingWindow(10, "1 h"),
       analytics: true,
       prefix: "tzk_rsvp_burst",
+    });
+
+    // Analytics Limit: Lightweight, high throughput per visitor per invitation
+    // Example: 20 events per 10 seconds (allows for quick interaction mapping)
+    analyticsLimiter = new Ratelimit({
+      redis: redis,
+      limiter: Ratelimit.slidingWindow(20, "10 s"),
+      analytics: false,
+      prefix: "tzk_analytics_burst",
     });
   }
 } catch (error) {
@@ -188,4 +198,26 @@ export async function checkRsvpRateLimit(invitationId: string): Promise<{ succes
   }
   
   return { success: true };
+}
+
+export async function checkAnalyticsRateLimit(invitationId: string): Promise<{ success: boolean; drop?: boolean; error?: string }> {
+  const ip = await getClientIp();
+  const key = `${ip}:${invitationId}`; 
+
+  if (analyticsLimiter) {
+    try {
+      const { success } = await analyticsLimiter.limit(key);
+      if (!success) {
+        return { success: false, error: 'تم تجاوز الحد المسموح للأحداث' };
+      }
+      return { success: true };
+    } catch (error) {
+      console.error("Upstash RateLimit Error (Analytics):", error);
+      // Fail-open for UX but drop event to prevent unbounded database ingestion
+      return { success: false, drop: true, error: 'Rate limit infrastructure unavailable' };
+    }
+  }
+
+  // If Redis is missing, Fail-open for UX but drop event
+  return { success: false, drop: true, error: 'Redis unconfigured' };
 }

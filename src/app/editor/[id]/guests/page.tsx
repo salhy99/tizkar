@@ -36,7 +36,9 @@ export default async function GuestsPage({ params }: { params: Promise<{ id: str
   const totalResponses = rsvps.length
   const attendingResponses = rsvps.filter(r => r.attendance_status === 'ATTENDING').length
   const declinedResponses = rsvps.filter(r => r.attendance_status === 'DECLINED').length
-  const totalExpectedAttendees = rsvps.reduce((acc, curr) => acc + (curr.guest_count || 0), 0)
+  const totalExpectedAttendees = rsvps
+    .filter(r => r.attendance_status === 'ATTENDING')
+    .reduce((acc, curr) => acc + (curr.guest_count || 0), 0)
 
   return (
     <div className="container mx-auto max-w-4xl p-4 md:p-8 space-y-8" dir="rtl">

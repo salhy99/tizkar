@@ -38,9 +38,7 @@ export function DashboardHeader({ userName, phone, userId }: { userName: string,
   const markAllAsRead = async () => {
     if (unreadCount === 0) return
     const supabase = createClient()
-    // @ts-expect-error - Supabase strict typing expects never for update when generated types are absent
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await supabase.from('notifications').update({ is_read: true } as any).eq('user_id', userId).eq('is_read', false)
+    await supabase.from('notifications').update({ is_read: true }).eq('user_id', userId).eq('is_read', false)
     setNotifications(notifications.map((n) => ({ ...n, is_read: true })))
   }
 

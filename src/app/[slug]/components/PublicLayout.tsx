@@ -6,6 +6,7 @@ import { submitRSVP } from '@/actions/publicInvitation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { useAnalyticsView, useAnalyticsInteractions } from '@/hooks/useAnalytics'
 
 // We wrap the renderer to provide centered desktop view and inject the RSVP/Story interactive parts.
 export default function PublicLayout({ 
@@ -22,6 +23,10 @@ export default function PublicLayout({
   const [companions, setCompanions] = useState(0)
   const [status, setStatus] = useState<'CONFIRMED' | 'MAYBE' | 'DECLINED'>('CONFIRMED')
   const [message, setMessage] = useState('')
+
+  // Analytics Hooks
+  useAnalyticsView(invitationId, false)
+  const { trackShare, trackMapClick } = useAnalyticsInteractions(invitationId)
 
   const handleRSVPSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -43,11 +48,13 @@ export default function PublicLayout({
   }
 
   const shareOnWhatsApp = () => {
+    trackShare('whatsapp')
     const text = `السلام عليكم ورحمة الله وبركاته ❤️\n\nبكل حب نتشرف بدعوتكم لمشاركتنا فرحتنا في زفاف ${data.groomName} و${data.brideName} 💍\n\n📅 ${data.dateText || data.date}\n⏰ ${data.timeText || data.time}\n📍 ${data.venue?.name || 'قاعة الحفل'}\n\nحضوركم يسعدنا ويكمل فرحتنا ❤️\n\n🔗 الدعوة:\n${window.location.href}`
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank')
   }
 
   const copyLink = () => {
+    trackShare('copy')
     navigator.clipboard.writeText(window.location.href)
     alert('تم نسخ الرابط بنجاح ✓')
   }
@@ -174,8 +181,18 @@ export default function PublicLayout({
     </div>
   )
 
+  const handleGlobalClick = (e: React.MouseEvent) => {
+    // Event delegation to capture map link clicks without modifying every template
+    const target = e.target as HTMLElement
+    const anchor = target.closest('a')
+    
+    if (anchor && data.venue?.url && anchor.href === data.venue.url) {
+      trackMapClick()
+    }
+  }
+
   return (
-    <div className="min-h-screen bg-[#222] flex justify-center">
+    <div className="min-h-screen bg-[#222] flex justify-center" onClick={handleGlobalClick}>
       <div className="w-full max-w-[480px] bg-white min-h-screen shadow-2xl relative overflow-x-hidden">
         {/* We use React.cloneElement to pass the rsvpAndShare as children if children is LayaliRenderer */}
         {React.isValidElement(children) 

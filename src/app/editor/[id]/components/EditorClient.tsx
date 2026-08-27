@@ -160,6 +160,9 @@ export default function EditorClient({
           </div>
           
           <div className="flex items-center gap-2">
+            <Button variant="outline" className="hidden lg:flex" onClick={() => router.push(`/editor/${invitationId}/analytics`)}>
+              إحصائيات
+            </Button>
             <Button variant="outline" className="hidden lg:flex" onClick={() => router.push(`/editor/${invitationId}/guests`)}>
               سجل الحضور
             </Button>
