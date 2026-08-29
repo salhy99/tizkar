@@ -52,15 +52,15 @@ type TemplateDefinition = {
 
 ### Template Selection Lifecycle
 
-The chosen policy is **Option B** from the Phase 8.5-A specification:
+The chosen policy is **Option B** (modified for Invitation-Scoped Billing):
 
-> Users may **browse and preview** any template, including Premium.
-> A Premium template **cannot be created** (stored as an invitation) without the `premiumTemplates` entitlement.
-> Enforcement happens **server-side** at `createInvitation()`.
+> Users may **browse, preview, and create drafts** using any template, including Premium.
+> A Premium template **cannot be published** without the `premiumTemplates` entitlement on the specific invitation's PAID order.
+> Enforcement happens **server-side** at `publishInvitationOwner()`.
 
 ### Authorization Matrix
 
-| Package | Preview Premium in Catalog | Create Invitation with Premium |
+| Package | Preview & Draft Premium | Publish Premium |
 |---|---|---|
 | `FREE_PREVIEW` | ✅ YES | ❌ NO |
 | `BASIC` | ✅ YES | ❌ NO |
@@ -69,19 +69,18 @@ The chosen policy is **Option B** from the Phase 8.5-A specification:
 
 ### Server Enforcement
 
-Located in: `src/actions/invitations.ts` → `createInvitation()`
+Located in: `src/actions/invitations.ts` → `publishInvitationOwner()`
 
 Flow:
 ```
-1. Validate template exists in DB
-2. Validate template is ACTIVE in DB
-3. Look up template in frontend registry
-4. IF registryTemplate.requiredEntitlement === 'premiumTemplates':
-   a. Require authenticated user (userId)
-   b. Query user's most recent PAID order
-   c. Resolve entitlements via getPackageEntitlements()
-   d. IF !ents.premiumTemplates → return error
-5. Continue with invitation creation
+1. Validate invitation ownership (Editor Token or User Auth).
+2. Fetch the latest `PAID` order for this specific `invitation_id`.
+3. Fetch the `slug` of the template attached to this invitation.
+4. Look up template in frontend registry.
+5. IF registryTemplate.requiredEntitlement === 'premiumTemplates':
+   a. Resolve entitlements via `requireInvitationFeature` for this `invitation_id`
+   b. IF !hasPremium → return error 'هذا القالب متاح للنشر ضمن باقة Premium.'
+6. Continue with publication
 ```
 
 Client-side UI (catalog lock state, badge) is **supplemental UX** only, never security.

@@ -43,39 +43,6 @@ export async function createInvitation(templateId: string) {
     return { error: 'هذا القالب قيد التطوير وغير متاح للاستخدام' }
   }
 
-  // 4a. Premium template entitlement gate (server-authoritative)
-  if (registryTemplate.requiredEntitlement === 'premiumTemplates') {
-    // Require authenticated user with PREMIUM package to create a premium invitation
-    if (!userId) {
-      return { error: 'يجب تسجيل الدخول واشتراك بالحزمة المميزة لاستخدام هذا القالب' }
-    }
-    // Resolve entitlements for this user — check their most recent paid order
-    const { createClient: createAdminClient2 } = await import('@supabase/supabase-js')
-    const adminCheck = createAdminClient2(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
-    const { data: premiumOrder } = await adminCheck
-      .from('orders')
-      .select('id, plans(name)')
-      .eq('user_id', userId)
-      .eq('status', 'PAID')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single()
-
-    const { getPackageEntitlements } = await import('@/lib/entitlements/registry')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const plansData = premiumOrder?.plans as any
-    const planName = Array.isArray(plansData) ? plansData[0]?.name : plansData?.name
-    const ents = getPackageEntitlements(planName)
-
-    if (!ents.premiumTemplates) {
-      return { error: 'هذا القالب متاح للاشتراك المميز فقط. يرجى ترقية حزمتك للمتابعة.' }
-    }
-  }
-
-
   // 5. Get active template version
   const activeVersion = template.template_versions.find((v: { status: string }) => v.status === 'ACTIVE') || template.template_versions[0];
   if (!activeVersion) {
@@ -231,6 +198,33 @@ export async function publishInvitationOwner(invitationId: string) {
   if (!order) {
     return { error: 'لا يوجد طلب دفع مؤكد (PAID) مرتبط بهذه الدعوة' }
   }
+
+  // ─── PREMIUM TEMPLATE PUBLICATION GATE ───
+  // 1. Fetch the invitation's template slug
+  const { data: invData } = await adminClient
+    .from('invitations')
+    .select('templates(slug)')
+    .eq('id', invitationId)
+    .single();
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const templateSlug = Array.isArray((invData?.templates as any)) 
+    ? (invData?.templates as any)[0]?.slug 
+    : (invData?.templates as any)?.slug;
+
+  if (templateSlug) {
+    const { getTemplate } = await import('@/components/templates/registry');
+    const registryTemplate = getTemplate(templateSlug);
+    
+    if (registryTemplate?.requiredEntitlement === 'premiumTemplates') {
+      const { requireInvitationFeature } = await import('@/lib/entitlements/server');
+      const hasPremium = await requireInvitationFeature(invitationId, 'premiumTemplates');
+      if (!hasPremium) {
+        return { error: 'هذا القالب متاح للنشر ضمن باقة Premium.' }
+      }
+    }
+  }
+  // ─────────────────────────────────────────
 
   // Generate unique clean slug if still draft slug
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
