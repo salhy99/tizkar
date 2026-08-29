@@ -50,7 +50,9 @@ export type TemplateFeatures = {
   rsvp: boolean
 }
 
-export type TemplateSlug = 'layali' | 'modern-invalid' | string; // Enforce known slugs, allow string for db types
+export type TemplateSlug = 'layali' | 'modern-glass' | 'rose-garden' | 'noor' | 'atheer' | string;
+
+export type PackageEntitlementKey = 'premiumTemplates'; // Extensible for future entitlements
 
 export type TemplateDefinition = {
   id: string
@@ -60,4 +62,6 @@ export type TemplateDefinition = {
   status: 'ACTIVE' | 'COMING_SOON' | 'HIDDEN'
   features: TemplateFeatures
   renderer: React.ComponentType<TemplateRendererProps>
+  /** Null = standard (no entitlement required). Non-null = premium feature key required. */
+  requiredEntitlement: PackageEntitlementKey | null
 }
