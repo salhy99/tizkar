@@ -18,11 +18,14 @@ describe('Entitlements Registry', () => {
     expect(getPackageEntitlements(undefined)).toEqual(DEFAULT_ENTITLEMENTS);
   });
 
-  test('FREE_PREVIEW provides basic limits but preserves features', () => {
-    const ent = getPackageEntitlements('FREE_PREVIEW');
-    expect(ent.analytics).toBe(true);
-    expect(ent.premiumTemplates).toBe(false);
-    expect(ent.maxImages).toBe(10);
-    expect(ent.invitationDurationDays).toBe(0);
+  it('FREE_PREVIEW provides basic limits but preserves features', () => {
+    const entitlements = getPackageEntitlements('FREE_PREVIEW')
+    expect(entitlements.analytics).toBe(true)
+    expect(entitlements.guestManagementPro).toBe(true)
+    expect(entitlements.maxImages).toBe(5)
+    expect(entitlements.maxAudioBytes).toBe(0)
+    expect(entitlements.maxGuestResponses).toBe(50)
+    expect(entitlements.storyExport).toBe(false)
+    expect(entitlements.audioAllowed).toBe(false)
   });
 });

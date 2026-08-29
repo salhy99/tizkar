@@ -29,6 +29,7 @@ export type InvitationData = {
   closing?: { text?: string; hashtag?: string };
   contact?: { name?: string; whatsapp?: string };
   gallery?: string[];
+  coverImage?: string;
   music?: { url?: string; type?: 'YOUTUBE' | 'MP3' };
 }
 

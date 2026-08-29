@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
-import { createMediaUploadToken, confirmMediaUpload } from '@/actions/storage'
+import { createMediaUploadToken, confirmMediaUpload, deleteMedia } from '@/actions/storage'
 import { Button } from '@/components/ui/button'
 
 type MusicUploaderProps = {
@@ -98,9 +98,17 @@ export default function MusicUploader({ invitationId, music, onChange }: MusicUp
         throw new Error(confirmRes.error || 'فشل تأكيد الملف')
       }
 
-      // 4. Success -> Add to Music state
+      // 4. Success -> Add to Music state, then clean up old if exists
       setStatus('SUCCESS')
-      onChange({ url: confirmRes.path, type: 'MP3' })
+      const newMusic = { url: confirmRes.path, type: 'MP3' as const }
+      
+      const oldUrl = music?.url
+      onChange(newMusic)
+      
+      // Best-effort cleanup of old track
+      if (oldUrl && oldUrl !== confirmRes.path) {
+        deleteMedia(invitationId, oldUrl).catch(console.error)
+      }
 
     } catch (err: unknown) {
       setStatus('ERROR')
@@ -108,14 +116,22 @@ export default function MusicUploader({ invitationId, music, onChange }: MusicUp
     }
   }
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
+    if (!confirm('هل أنت متأكد من حذف الموسيقى الحالية؟')) return
+    
     setFile(null)
     if (previewUrl) {
       URL.revokeObjectURL(previewUrl)
       setPreviewUrl(null)
     }
     setStatus('IDLE')
+    
+    const oldUrl = music?.url
     onChange(undefined)
+    
+    if (oldUrl) {
+      await deleteMedia(invitationId, oldUrl).catch(console.error)
+    }
   }
 
   const hasExistingMusic = music?.url && music.type === 'MP3'

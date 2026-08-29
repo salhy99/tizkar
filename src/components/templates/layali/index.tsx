@@ -28,12 +28,25 @@ export function LayaliRenderer(props: TemplateRendererProps) {
       
       {/* Hero / Names */}
       <section className="flex flex-col items-center justify-center p-8 text-center min-h-screen relative overflow-hidden">
+        {/* Background Cover Image */}
+        {data.coverImage && (
+          <div className="absolute inset-0 z-0">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img 
+              src={`${process.env.NEXT_PUBLIC_SUPABASE_URL || ''}/storage/v1/object/public/invitations_assets/${data.coverImage}`}
+              alt="صورة رئيسية"
+              className="w-full h-full object-cover opacity-30"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#FAF8F3] via-transparent to-[#FAF8F3]/50" />
+          </div>
+        )}
+
         {/* Subtle decorative elements for luxury vibe */}
-        <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-[#A88952]/10 to-transparent"></div>
-        <div className="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-[#A88952]/10 to-transparent"></div>
+        <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-[#A88952]/10 to-transparent z-0"></div>
+        <div className="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-[#A88952]/10 to-transparent z-0"></div>
         
         <div className="z-10 flex flex-col items-center space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-1000">
-          <div className="text-sm font-bold tracking-widest text-[#A88952] border border-[#A88952]/30 px-6 py-2 rounded-full">بسم الله الرحمن الرحيم</div>
+          <div className="text-sm font-bold tracking-widest text-[#A88952] border border-[#A88952]/30 px-6 py-2 rounded-full backdrop-blur-sm bg-[#FAF8F3]/80">بسم الله الرحمن الرحيم</div>
           
           <div className="py-8">
             <h1 className="text-5xl md:text-6xl font-bold text-[#A88952] leading-tight mb-2">

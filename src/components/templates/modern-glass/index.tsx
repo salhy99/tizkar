@@ -83,6 +83,20 @@ export function ModernGlassRenderer({ data, mode = 'public', children }: Templat
           overflow: 'hidden',
         }}
       >
+        {/* Background Cover Image */}
+        {data.coverImage && (
+          <div aria-hidden="true" style={{
+            position: 'absolute', inset: 0, zIndex: 0
+          }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img 
+              src={`${process.env.NEXT_PUBLIC_SUPABASE_URL || ''}/storage/v1/object/public/invitations_assets/${data.coverImage}`}
+              alt="صورة رئيسية"
+              style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.2 }}
+            />
+          </div>
+        )}
+
         {/* Background geometric accent */}
         <div aria-hidden="true" style={{
           position: 'absolute', top: '-80px', left: '-80px',
@@ -90,6 +104,7 @@ export function ModernGlassRenderer({ data, mode = 'public', children }: Templat
           border: `1px solid ${T.glassBorder}`,
           borderRadius: '50%',
           opacity: 0.5,
+          zIndex: 0
         }} />
         <div aria-hidden="true" style={{
           position: 'absolute', bottom: '-60px', right: '-60px',
@@ -97,6 +112,7 @@ export function ModernGlassRenderer({ data, mode = 'public', children }: Templat
           border: `1px solid ${T.glassBorder}`,
           borderRadius: '50%',
           opacity: 0.5,
+          zIndex: 0
         }} />
 
         {/* Bismillah badge */}

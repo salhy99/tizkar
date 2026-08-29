@@ -142,10 +142,23 @@ export function RoseGardenRenderer({ data, mode = 'public', children }: Template
           padding: '48px 28px',
           textAlign: 'center',
           position: 'relative',
-          background: `radial-gradient(ellipse at top, ${R.cream} 0%, ${R.ivory} 60%)`,
+          background: data.coverImage ? R.ivory : `radial-gradient(ellipse at top, ${R.cream} 0%, ${R.ivory} 60%)`,
           overflow: 'hidden',
         }}
       >
+        {/* Background Cover Image */}
+        {data.coverImage && (
+          <div aria-hidden="true" style={{
+            position: 'absolute', inset: 0, zIndex: 0
+          }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img 
+              src={`${process.env.NEXT_PUBLIC_SUPABASE_URL || ''}/storage/v1/object/public/invitations_assets/${data.coverImage}`}
+              alt="صورة رئيسية"
+              style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.2 }}
+            />
+          </div>
+        )}
         {/* Floral corners — top */}
         <div style={{ position: 'absolute', top: 0, right: 0 }} aria-hidden="true">
           <FloralCorner />

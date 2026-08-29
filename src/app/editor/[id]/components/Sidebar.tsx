@@ -2,7 +2,7 @@
 
 import React from 'react'
 import { InvitationData, TemplateFeatures } from '@/components/templates/types'
-import GalleryUploader from '@/components/ui/media/GalleryUploader'
+import MediaGalleryManager from '@/components/ui/media/MediaGalleryManager'
 import MusicUploader from '@/components/ui/media/MusicUploader'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { Input } from '@/components/ui/input'
@@ -359,10 +359,13 @@ export default function Sidebar({ invitationId, data, onChange, hasRecoveryKey =
             معرض الصور
           </AccordionTrigger>
           <AccordionContent className="pt-2 pb-4 text-right">
-            <GalleryUploader 
+            <MediaGalleryManager 
               invitationId={invitationId} 
               gallery={data.gallery || []} 
-              onChange={(urls) => update('gallery', urls)} 
+              coverImage={data.coverImage}
+              onChangeGallery={(urls) => update('gallery', urls)} 
+              onChangeCover={(cover) => update('coverImage', cover)}
+              maxImages={entitlements.maxImages}
             />
           </AccordionContent>
         </AccordionItem>

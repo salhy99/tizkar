@@ -252,3 +252,42 @@ export async function confirmMediaUpload(
     return { success: false, error: msg }
   }
 }
+
+export async function deleteMedia(invitationId: string, path: string) {
+  try {
+    const { userId } = await verifyAuthAndOwnership(invitationId)
+    
+    // Validate path structure
+    if (!path || path.includes('..') || path.startsWith('/')) {
+      return { success: false, error: 'Invalid path' }
+    }
+
+    const segments = path.split('/')
+    if (segments.length !== 3) {
+      return { success: false, error: 'Invalid path structure' }
+    }
+    
+    const [pathPrefix, pathInvId] = segments
+    const expectedPrefix = userId || 'anon'
+    
+    if (pathPrefix !== expectedPrefix || pathInvId !== invitationId) {
+      return { success: false, error: 'Path mismatch' }
+    }
+    
+    const adminClient = getAdminClient()
+    
+    const { error: removeError } = await adminClient.storage
+      .from('invitations_assets')
+      .remove([path])
+      
+    if (removeError) {
+      console.error('Delete Media Error:', removeError)
+      return { success: false, error: 'Failed to delete file from storage' }
+    }
+    
+    return { success: true }
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Delete failed'
+    return { success: false, error: msg }
+  }
+}
