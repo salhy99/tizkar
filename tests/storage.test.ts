@@ -51,7 +51,7 @@ describe('deleteMedia Server Action', () => {
   })
 
   it('validates invitationId and path ownership for authenticated user', async () => {
-    // @ts-ignore
+    // @ts-expect-error mock
     requireInvitationEditAccess.mockResolvedValue({ user_id: 'user123' })
     
     const res = await deleteMedia('inv123', 'user123/inv123/uuid.jpg')
@@ -61,7 +61,7 @@ describe('deleteMedia Server Action', () => {
   })
 
   it('validates invitationId and path ownership for anonymous user', async () => {
-    // @ts-ignore
+    // @ts-expect-error mock
     requireInvitationEditAccess.mockResolvedValue({ user_id: null })
     
     const res = await deleteMedia('inv123', 'anon/inv123/uuid.jpg')
@@ -70,7 +70,7 @@ describe('deleteMedia Server Action', () => {
   })
 
   it('rejects foreign anon path (wrong invitation id)', async () => {
-    // @ts-ignore
+    // @ts-expect-error mock
     requireInvitationEditAccess.mockResolvedValue({ user_id: null })
     
     const res = await deleteMedia('inv123', 'anon/inv999/uuid.jpg')
@@ -79,7 +79,7 @@ describe('deleteMedia Server Action', () => {
   })
 
   it('rejects foreign user path (wrong invitation id)', async () => {
-    // @ts-ignore
+    // @ts-expect-error mock
     requireInvitationEditAccess.mockResolvedValue({ user_id: 'user123' })
     
     const res = await deleteMedia('inv123', 'user123/inv999/uuid.jpg')
@@ -88,7 +88,7 @@ describe('deleteMedia Server Action', () => {
   })
 
   it('rejects foreign user path (wrong user id)', async () => {
-    // @ts-ignore
+    // @ts-expect-error mock
     requireInvitationEditAccess.mockResolvedValue({ user_id: 'user123' })
     
     const res = await deleteMedia('inv123', 'otheruser/inv123/uuid.jpg')
@@ -97,7 +97,7 @@ describe('deleteMedia Server Action', () => {
   })
 
   it('rejects malformed path', async () => {
-    // @ts-ignore
+    // @ts-expect-error mock
     requireInvitationEditAccess.mockResolvedValue({ user_id: 'user123' })
     
     const res = await deleteMedia('inv123', 'user123/inv123/folder/uuid.jpg')
@@ -106,7 +106,7 @@ describe('deleteMedia Server Action', () => {
   })
 
   it('rejects path traversal attempts', async () => {
-    // @ts-ignore
+    // @ts-expect-error mock
     requireInvitationEditAccess.mockResolvedValue({ user_id: 'user123' })
     
     const res = await deleteMedia('inv123', 'user123/inv123/../uuid.jpg')
@@ -115,7 +115,7 @@ describe('deleteMedia Server Action', () => {
   })
 
   it('rejects absolute paths', async () => {
-    // @ts-ignore
+    // @ts-expect-error mock
     requireInvitationEditAccess.mockResolvedValue({ user_id: 'user123' })
     
     const res = await deleteMedia('inv123', '/user123/inv123/uuid.jpg')
@@ -124,7 +124,7 @@ describe('deleteMedia Server Action', () => {
   })
 
   it('handles storage deletion failure', async () => {
-    // @ts-ignore
+    // @ts-expect-error mock
     requireInvitationEditAccess.mockResolvedValue({ user_id: 'user123' })
     
     global.fetch = vi.fn().mockResolvedValue({

@@ -5,6 +5,7 @@ import { TemplateRendererProps } from '../types'
 import RoseCountdown from './components/RoseCountdown'
 import RoseGallery from './components/RoseGallery'
 import RoseMusicPlayer from './components/RoseMusicPlayer'
+import { getMediaUrl } from '@/lib/media-helpers'
 
 // ─── Centralized Theme ────────────────────────────────────────────────────────
 const R = {
@@ -153,7 +154,7 @@ export function RoseGardenRenderer({ data, mode = 'public', children }: Template
           }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img 
-              src={`${process.env.NEXT_PUBLIC_SUPABASE_URL || ''}/storage/v1/object/public/invitations_assets/${data.coverImage}`}
+              src={getMediaUrl(data.coverImage)}
               alt="صورة رئيسية"
               style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.2 }}
             />

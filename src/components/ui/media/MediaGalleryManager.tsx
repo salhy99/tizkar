@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core'
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, rectSortingStrategy, useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { getMediaUrl } from '@/lib/media-helpers'
 
 type UploadItem = {
   id: string
@@ -42,8 +43,7 @@ function SortableGalleryItem({ id, path, isCover, onSetCover, onRemove, disabled
   // Use the raw path for now. The public viewer uses this raw path to construct the Supabase storage URL.
   // We need to resolve it for the editor preview if necessary, but typically Next config handles it or we use raw Supabase URL.
   // For safety, we just show a preview text or standard image if we can construct the URL.
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const imageUrl = `${supabaseUrl}/storage/v1/object/public/invitations_assets/${path}`
+  const imageUrl = getMediaUrl(path)
 
   return (
     <div ref={setNodeRef} style={style} className={`relative aspect-[3/4] bg-muted rounded-xl border-2 overflow-hidden flex flex-col group ${isCover ? 'border-[#A88952] shadow-md' : 'border-border'}`}>

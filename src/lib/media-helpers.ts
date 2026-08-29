@@ -32,3 +32,10 @@ export function handleCoverDeletion(coverImage: string | undefined, deletedPath:
   if (coverImage === deletedPath) return undefined
   return coverImage
 }
+
+export function getMediaUrl(path: string | undefined | null): string {
+  if (!path) return ''
+  if (path.startsWith('http')) return path
+  // Resolve using our explicit secure resolver
+  return `/api/media?path=${encodeURIComponent(path)}`
+}

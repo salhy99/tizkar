@@ -6,6 +6,7 @@ import Gallery from './components/Gallery'
 import MusicPlayer from './components/MusicPlayer'
 
 import { TemplateRendererProps } from '../types'
+import { getMediaUrl } from '@/lib/media-helpers'
 
 export function LayaliRenderer(props: TemplateRendererProps) {
   const { data, children } = props
@@ -33,7 +34,7 @@ export function LayaliRenderer(props: TemplateRendererProps) {
           <div className="absolute inset-0 z-0">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img 
-              src={`${process.env.NEXT_PUBLIC_SUPABASE_URL || ''}/storage/v1/object/public/invitations_assets/${data.coverImage}`}
+              src={getMediaUrl(data.coverImage)}
               alt="صورة رئيسية"
               className="w-full h-full object-cover opacity-30"
             />
