@@ -5,7 +5,7 @@ import { TemplateRendererProps } from '../types'
 import GlassCountdown from './components/GlassCountdown'
 import GlassGallery from './components/GlassGallery'
 import GlassMusicPlayer from './components/GlassMusicPlayer'
-import { getMediaUrl } from '@/lib/media-helpers'
+import { getMediaUrl } from '../../../lib/media-helpers'
 
 // ─── Centralized Theme ────────────────────────────────────────────────────────
 const T = {

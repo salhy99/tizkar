@@ -5,7 +5,7 @@ import { TemplateRendererProps } from '../types'
 import RoseCountdown from './components/RoseCountdown'
 import RoseGallery from './components/RoseGallery'
 import RoseMusicPlayer from './components/RoseMusicPlayer'
-import { getMediaUrl } from '@/lib/media-helpers'
+import { getMediaUrl } from '../../../lib/media-helpers'
 
 // ─── Centralized Theme ────────────────────────────────────────────────────────
 const R = {

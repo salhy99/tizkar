@@ -6,7 +6,7 @@ import Gallery from './components/Gallery'
 import MusicPlayer from './components/MusicPlayer'
 
 import { TemplateRendererProps } from '../types'
-import { getMediaUrl } from '@/lib/media-helpers'
+import { getMediaUrl } from '../../../lib/media-helpers'
 
 export function LayaliRenderer(props: TemplateRendererProps) {
   const { data, children } = props

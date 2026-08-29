@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core'
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, rectSortingStrategy, useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { getMediaUrl } from '@/lib/media-helpers'
+import { getMediaUrl } from '../../../lib/media-helpers'
 
 type UploadItem = {
   id: string
