@@ -2,6 +2,7 @@
 
 import { createClient as createServerClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
+import { requireInvitationLimit, requireInvitationFeature, getInvitationEntitlements } from '@/lib/entitlements/server'
 
 const ALLOWED_MIME_TYPES: Record<string, string> = {
   'image/jpeg': 'jpg',
@@ -66,10 +67,23 @@ async function checkQuota(_supabase: unknown, invitationId: string, category: 'g
   
   if (category === 'gallery') {
     const images = Array.isArray(data.gallery) ? data.gallery : []
-    if (images.length >= CATEGORY_LIMITS.gallery) {
-      throw new Error(`Exceeded maximum limit of ${CATEGORY_LIMITS.gallery} images`)
+    
+    // Check package limit
+    const isWithinLimit = await requireInvitationLimit(invitationId, 'maxImages', images.length + 1)
+    if (!isWithinLimit) {
+      throw new Error(`تم الوصول للحد الأقصى للصور المسموح بها في باقتك الحالية`)
+    }
+    
+    // Also enforce absolute global security bound just in case
+    if (images.length >= CATEGORY_LIMITS.gallery * 3) {
+       throw new Error(`Exceeded absolute platform maximum limit of images`)
     }
   } else if (category === 'music') {
+    const hasAudio = await requireInvitationFeature(invitationId, 'audioAllowed')
+    if (!hasAudio) {
+      throw new Error('ميزة الموسيقى الخلفية غير متاحة في باقتك الحالية')
+    }
+
     // If music already has a valid path string, it's 1. 
     // Usually music is stored as a string URL or object.
     const music = typeof data.music === 'string' ? data.music : data.music?.path
@@ -207,14 +221,23 @@ export async function confirmMediaUpload(
 
     // 13 & 14. Verify actual file size
     const actualSize = fileMeta.metadata?.size || 0
-    const maxSize = CATEGORY_SIZE_LIMITS[category]
+    let maxSize = CATEGORY_SIZE_LIMITS[category]
+    
+    // Apply stricter package limit if applicable
+    if (category === 'music') {
+      const { entitlements } = await getInvitationEntitlements(invitationId)
+      if (entitlements.maxAudioBytes > 0 && entitlements.maxAudioBytes < maxSize) {
+        maxSize = entitlements.maxAudioBytes
+      }
+    }
+
     if (actualSize === 0) {
       return { success: false, error: 'File is empty' }
     }
     if (actualSize > maxSize) {
       // Clean up the oversized file immediately as defense-in-depth
       await adminClient.storage.from('invitations_assets').remove([path])
-      return { success: false, error: 'File exceeds maximum allowed size' }
+      return { success: false, error: 'حجم الملف يتجاوز الحد الأقصى المسموح به' }
     }
 
     // 15. Re-check media quota before final approval

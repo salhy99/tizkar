@@ -1,6 +1,7 @@
 'use server'
 
 import { requireInvitationEditAccess } from '@/lib/auth/invitation-auth'
+import { requireInvitationLimit } from '@/lib/entitlements/server'
 
 export async function submitRsvp(
   invitationId: string, 
@@ -52,6 +53,20 @@ export async function submitRsvp(
     return { error: 'انتهت صلاحية هذه الدعوة' }
   }
 
+  // 3b. Verify Entitlement Limit for RSVP Responses
+  const { count: currentRsvpsCount, error: countError } = await adminClient
+    .from('invitation_rsvps')
+    .select('id', { count: 'exact', head: true })
+    .eq('invitation_id', invitationId)
+
+  if (countError) return { error: 'حدث خطأ أثناء فحص البيانات' }
+  
+  const isWithinLimit = await requireInvitationLimit(invitationId, 'maxGuestResponses', (currentRsvpsCount || 0) + 1)
+  
+  if (!isWithinLimit) {
+    return { error: 'عذراً، لا يمكن تسجيل الحضور حيث وصلت هذه الدعوة إلى الحد الأقصى من الردود المسموحة للباقة الحالية.' }
+  }
+
   // 4. Narrow Insert using Service Role
   const { error: insertError } = await adminClient
     .from('invitation_rsvps')
@@ -72,9 +87,13 @@ export async function submitRsvp(
 }
 
 export async function getInvitationRsvps(invitationId: string) {
-  // 1. Authorize Owner
+  // 1. Authorize Owner and Feature
   const authorizedInv = await requireInvitationEditAccess(invitationId)
   if (!authorizedInv) return { error: 'غير مصرح لك بعرض هذه البيانات' }
+  
+  const { requireInvitationFeature } = await import('@/lib/entitlements/server')
+  const hasGuestPro = await requireInvitationFeature(invitationId, 'guestManagementPro')
+  if (!hasGuestPro) return { error: 'هذه الميزة غير متاحة في باقتك الحالية' }
 
   // 2. Fetch using Service Role
   const { createClient: createAdminClient } = await import('@supabase/supabase-js')
@@ -95,9 +114,13 @@ export async function getInvitationRsvps(invitationId: string) {
 }
 
 export async function deleteRsvp(invitationId: string, rsvpId: string) {
-  // 1. Authorize Owner
+  // 1. Authorize Owner and Feature
   const authorizedInv = await requireInvitationEditAccess(invitationId)
   if (!authorizedInv) return { error: 'غير مصرح' }
+
+  const { requireInvitationFeature } = await import('@/lib/entitlements/server')
+  const hasGuestPro = await requireInvitationFeature(invitationId, 'guestManagementPro')
+  if (!hasGuestPro) return { error: 'هذه الميزة غير متاحة في باقتك الحالية' }
 
   // 2. Delete using Service Role (matching invitationId to prevent deleting other rsvps)
   const { createClient: createAdminClient } = await import('@supabase/supabase-js')

@@ -1,7 +1,7 @@
 import { ImageResponse } from 'next/og';
 import { requireInvitationEditAccess } from '@/lib/auth/invitation-auth';
-import { createClient } from '@supabase/supabase-js';
 import { getShareVisualAdapter, loadLocalFont } from '@/components/share';
+import { requireInvitationFeature } from '@/lib/entitlements/server';
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -12,7 +12,13 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       return new Response('Unauthorized', { status: 401 });
     }
 
-    // 2. Fetch full data (admin client to bypass RLS for token users)
+    const hasStoryExport = await requireInvitationFeature(p.id, 'storyExport');
+    if (!hasStoryExport) {
+      return new Response('Story Export is not included in your current package.', { status: 403 });
+    }
+
+    // 3. Fetch full data (admin client to bypass RLS for token users)
+    const { createClient } = await import('@supabase/supabase-js');
     const adminClient = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!

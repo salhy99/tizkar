@@ -3,7 +3,9 @@
 import React, { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Download, Share2, Copy, Search, CheckCircle, XCircle, HelpCircle, Users, Eye, ArrowUpRight } from 'lucide-react'
+import { Download, Share2, Copy, Search, CheckCircle, XCircle, HelpCircle, Users, Eye, ArrowUpRight, Crown } from 'lucide-react'
+import { PackageEntitlements } from '@/lib/entitlements/registry'
+import Link from 'next/link'
 
 type Rsvp = {
   id: string;
@@ -25,7 +27,7 @@ type InvitationStats = {
   totalGuests: number;
 }
 
-export default function InvitationDashboardClient({ inv, rsvps, stats, isExpired }: { inv: Record<string, unknown>, rsvps: Rsvp[], stats: InvitationStats, isExpired: boolean }) {
+export default function InvitationDashboardClient({ inv, rsvps, stats, isExpired, planName, entitlements }: { inv: Record<string, unknown>, rsvps: Rsvp[], stats: InvitationStats, isExpired: boolean, planName: string, entitlements: PackageEntitlements }) {
   const [searchTerm, setSearchTerm] = useState('')
   const [filter, setFilter] = useState<'ALL' | 'CONFIRMED' | 'MAYBE' | 'DECLINED'>('ALL')
   
@@ -91,7 +93,7 @@ export default function InvitationDashboardClient({ inv, rsvps, stats, isExpired
   return (
     <div className="space-y-8">
       {/* Overview Cards */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         
         {/* URL & QR Card */}
         <div className="bg-white p-6 rounded-3xl border border-border shadow-sm flex flex-col items-center text-center lg:col-span-1">
@@ -121,7 +123,39 @@ export default function InvitationDashboardClient({ inv, rsvps, stats, isExpired
         </div>
 
         {/* Stats Grid */}
-        <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-4">
+          
+          <div className="bg-white p-6 rounded-3xl border border-[#A88952]/30 shadow-sm relative overflow-hidden">
+            <div className="absolute -right-6 -top-6 w-24 h-24 bg-[#A88952]/5 rounded-full blur-2xl"></div>
+            <div className="flex items-center gap-3 mb-4 text-[#A88952]">
+              <div className="p-3 bg-[#A88952]/10 rounded-xl"><Crown className="w-6 h-6" /></div>
+              <h3 className="text-lg font-bold">الباقة الحالية</h3>
+            </div>
+            <div className="space-y-4">
+              <div className="flex justify-between items-end border-b border-gray-100 pb-2">
+                <span className="text-muted-foreground">الباقة</span>
+                <span className="font-bold text-[#1C1C1C]">{planName}</span>
+              </div>
+              <div className="flex justify-between items-end border-b border-gray-100 pb-2">
+                <span className="text-muted-foreground">تأكيد الحضور</span>
+                <span className="font-bold">{entitlements.maxGuestResponses === null ? 'غير محدود' : `حتى ${entitlements.maxGuestResponses}`}</span>
+              </div>
+              <div className="flex justify-between items-end border-b border-gray-100 pb-2">
+                <span className="text-muted-foreground">عدد الصور</span>
+                <span className="font-bold">حتى {entitlements.maxImages}</span>
+              </div>
+              <div className="flex justify-between items-end pb-2">
+                <span className="text-muted-foreground">موسيقى خلفية</span>
+                <span className="font-bold">{entitlements.audioAllowed ? 'متاحة' : 'غير متاحة'}</span>
+              </div>
+              
+              <Link href={`/dashboard/plans/${inv.id}`} className="block mt-4">
+                <Button variant="outline" className="w-full border-[#A88952] text-[#A88952] hover:bg-[#A88952]/10 rounded-xl">
+                  ترقية أو إدارة الباقة
+                </Button>
+              </Link>
+            </div>
+          </div>
           <div className="bg-white p-6 rounded-3xl border border-border shadow-sm">
             <div className="flex items-center gap-3 mb-4 text-[#A88952]">
               <div className="p-3 bg-[#A88952]/10 rounded-xl"><Eye className="w-6 h-6" /></div>

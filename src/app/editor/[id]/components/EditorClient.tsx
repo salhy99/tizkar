@@ -8,6 +8,7 @@ import { PhoneFrame } from '@/components/ui/phone-frame'
 import { TemplateRenderer } from '@/components/templates/TemplateRenderer'
 import { InvitationData } from '@/components/templates/types'
 import { Button } from '@/components/ui/button'
+import { PackageEntitlements } from '@/lib/entitlements'
 import Sidebar from './Sidebar'
 
 export default function EditorClient({ 
@@ -17,7 +18,9 @@ export default function EditorClient({
   invitationStatus,
   paymentOrder,
   hasRecoveryKey,
-  templateSlug
+  templateSlug,
+  entitlements,
+  planName
 }: { 
   invitationId: string, 
   initialTitle: string, 
@@ -25,7 +28,9 @@ export default function EditorClient({
   invitationStatus: string,
   paymentOrder: { id: string, status: string } | null,
   hasRecoveryKey: boolean,
-  templateSlug: string
+  templateSlug: string,
+  entitlements: PackageEntitlements,
+  planName: string
 }) {
   const router = useRouter()
   const [data, setData] = useState<InvitationData>(initialData)
@@ -235,7 +240,7 @@ export default function EditorClient({
           </div>
           
           <div className="flex-1 overflow-y-auto custom-scrollbar p-4">
-            <Sidebar invitationId={invitationId} data={data} onChange={handleDataChange} hasRecoveryKey={hasRecoveryKey} features={getTemplate(templateSlug)?.features || { gallery: true, map: true, program: true, parents: true, music: true, rsvp: true }} />
+            <Sidebar invitationId={invitationId} data={data} onChange={handleDataChange} hasRecoveryKey={hasRecoveryKey} features={getTemplate(templateSlug)?.features || { gallery: true, map: true, program: true, parents: true, music: true, rsvp: true }} entitlements={entitlements} planName={planName} />
           </div>
         </aside>
 

@@ -84,9 +84,13 @@ export async function recordAnalyticsEvent(
 }
 
 export async function getAnalyticsMetrics(invitationId: string) {
-  // 1. Authorize Owner
+  // 1. Authorize Owner and Feature
   const authorizedInv = await requireInvitationEditAccess(invitationId)
   if (!authorizedInv) return { error: 'غير مصرح' }
+
+  const { requireInvitationFeature } = await import('@/lib/entitlements/server')
+  const hasAnalytics = await requireInvitationFeature(invitationId, 'analytics')
+  if (!hasAnalytics) return { error: 'هذه الميزة غير متاحة في باقتك الحالية' }
 
   const adminClient = createClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

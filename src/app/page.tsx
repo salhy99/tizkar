@@ -1,7 +1,15 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { PackageComparison } from "@/components/ui/PackageComparison";
+import { createClient } from "@/lib/supabase/server";
 
-export default function Home() {
+export default async function Home() {
+  const supabase = await createClient();
+  const { data: plans } = await supabase
+    .from('plans')
+    .select('*')
+    .eq('status', 'ACTIVE')
+    .order('display_order', { ascending: true });
   return (
     <main className="flex min-h-screen flex-col items-center">
       {/* Navbar Placeholder */}
@@ -97,43 +105,8 @@ export default function Home() {
           <h2 className="text-4xl font-bold mb-4">باقات تِذكار</h2>
           <p className="text-xl text-muted-foreground mb-16">دعوتك فعّالة لمدة 120 يومًا</p>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            {/* Free */}
-            <div className="rounded-3xl border border-border p-8 text-right bg-background">
-              <div className="text-xl font-bold mb-2">FREE PREVIEW</div>
-              <div className="text-3xl font-bold mb-6">0 <span className="text-lg font-normal text-muted-foreground">د.ع</span></div>
-              <ul className="space-y-4 mb-8 text-muted-foreground">
-                <li className="flex items-center gap-2">✓ تصفح جميع القوالب</li>
-                <li className="flex items-center gap-2">✓ معاينة تفاعلية</li>
-              </ul>
-              <Button variant="outline" className="w-full">جرب الآن</Button>
-            </div>
-            
-            {/* Basic */}
-            <div className="rounded-3xl border-2 border-primary p-8 text-right bg-primary/5 relative">
-              <div className="absolute top-0 right-8 -translate-y-1/2 bg-primary text-white px-4 py-1 rounded-full text-sm">الأكثر طلباً</div>
-              <div className="text-xl font-bold mb-2 text-primary">BASIC</div>
-              <div className="text-4xl font-bold mb-6">25,000 <span className="text-lg font-normal text-muted-foreground">د.ع</span></div>
-              <ul className="space-y-4 mb-8">
-                <li className="flex items-center gap-2">✓ نشر الدعوة برابط خاص</li>
-                <li className="flex items-center gap-2">✓ تصميم أنيق متجاوب</li>
-                <li className="flex items-center gap-2">✓ إضافة الصور والنصوص</li>
-              </ul>
-              <Button className="w-full bg-primary hover:bg-primary/90">اشترك الآن</Button>
-            </div>
-            
-            {/* Premium */}
-            <div className="rounded-3xl border border-border p-8 text-right bg-background">
-              <div className="text-xl font-bold mb-2">PREMIUM</div>
-              <div className="text-3xl font-bold mb-6">60,000 <span className="text-lg font-normal text-muted-foreground">د.ع</span></div>
-              <ul className="space-y-4 mb-8 text-muted-foreground">
-                <li className="flex items-center gap-2">✓ كل ميزات Basic</li>
-                <li className="flex items-center gap-2">✓ تأكيد الحضور RSVP</li>
-                <li className="flex items-center gap-2">✓ مولد Story للضيوف</li>
-              </ul>
-              <Button variant="outline" className="w-full">اشترك الآن</Button>
-            </div>
-          </div>
+          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+          <PackageComparison plans={(plans as any) || []} />
         </div>
       </section>
 

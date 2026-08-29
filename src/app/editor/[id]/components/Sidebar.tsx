@@ -9,6 +9,9 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
 import { Button } from '@/components/ui/button'
+import { PackageEntitlements } from '@/lib/entitlements'
+import { FeatureGate } from '@/components/ui/FeatureGate'
+import Link from 'next/link'
 
 type SidebarProps = {
   invitationId: string;
@@ -16,9 +19,11 @@ type SidebarProps = {
   onChange: (data: InvitationData) => void;
   hasRecoveryKey?: boolean;
   features: TemplateFeatures;
+  entitlements: PackageEntitlements;
+  planName?: string;
 }
 
-export default function Sidebar({ invitationId, data, onChange, hasRecoveryKey = false, features }: SidebarProps) {
+export default function Sidebar({ invitationId, data, onChange, hasRecoveryKey = false, features, entitlements, planName = 'FREE_PREVIEW' }: SidebarProps) {
   
   const update = (key: keyof InvitationData, value: unknown) => {
     onChange({ ...data, [key]: value })
@@ -80,6 +85,44 @@ export default function Sidebar({ invitationId, data, onChange, hasRecoveryKey =
   return (
     <Accordion className="w-full space-y-4">
       
+      {/* 0. Current Package */}
+      <AccordionItem value="current-package" className="border border-[#A88952]/30 rounded-xl bg-[#A88952]/5 px-4">
+        <AccordionTrigger className="hover:no-underline font-bold text-right py-4 text-[#A88952]">
+          الباقة الحالية
+        </AccordionTrigger>
+        <AccordionContent className="space-y-4 pt-2 pb-4 text-right">
+          <div className="flex flex-col gap-2">
+            <div className="flex justify-between items-center bg-white p-3 rounded-lg border border-[#A88952]/20">
+              <span className="font-bold text-[#1C1C1C]">{planName}</span>
+              <span className="text-xs bg-[#A88952] text-white px-2 py-1 rounded-full font-bold">
+                {planName === 'FREE_PREVIEW' ? 'معاينة مجانية' : 'مفعل'}
+              </span>
+            </div>
+            
+            <div className="bg-white p-3 rounded-lg border border-border text-sm space-y-2">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">عدد الصور</span>
+                <span className="font-bold">حتى {entitlements.maxImages}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">موسيقى خلفية</span>
+                <span className="font-bold">{entitlements.audioAllowed ? 'متاحة' : 'غير متاحة'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">تأكيد الحضور (RSVP)</span>
+                <span className="font-bold">{entitlements.maxGuestResponses === null ? 'غير محدود' : `حتى ${entitlements.maxGuestResponses}`}</span>
+              </div>
+            </div>
+
+            <Link href={`/dashboard/plans/${invitationId}`} className="block w-full mt-2">
+              <Button variant="outline" className="w-full border-[#A88952] text-[#A88952] hover:bg-[#A88952]/10">
+                ترقية أو إدارة الباقة
+              </Button>
+            </Link>
+          </div>
+        </AccordionContent>
+      </AccordionItem>
+
       {/* 1. Event Info */}
       <AccordionItem value="event-info" className="border border-border rounded-xl bg-white px-4">
         <AccordionTrigger className="hover:no-underline font-bold text-right py-4">
@@ -332,11 +375,18 @@ export default function Sidebar({ invitationId, data, onChange, hasRecoveryKey =
             الموسيقى
           </AccordionTrigger>
           <AccordionContent className="space-y-4 pt-2 pb-4 text-right">
-            <MusicUploader 
-              invitationId={invitationId} 
-              music={data.music} 
-              onChange={(newMusic) => update('music', newMusic)} 
-            />
+            <FeatureGate 
+              isLocked={!entitlements.audioAllowed} 
+              featureName="الموسيقى الخلفية" 
+              requiredPackage="Plus"
+              invitationId={invitationId}
+            >
+              <MusicUploader 
+                invitationId={invitationId} 
+                music={data.music} 
+                onChange={(newMusic) => update('music', newMusic)} 
+              />
+            </FeatureGate>
           </AccordionContent>
         </AccordionItem>
       )}

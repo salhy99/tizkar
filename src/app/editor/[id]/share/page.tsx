@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { requireInvitationEditAccess } from "@/lib/auth/invitation-auth";
 import ShareClient from "./ShareClient";
 import { createClient } from "@supabase/supabase-js";
+import { getInvitationEntitlements } from "@/lib/entitlements/server";
 
 export const metadata = {
   robots: {
@@ -59,6 +60,8 @@ export default async function SharePage({ params }: { params: Promise<{ id: stri
   const activeVersion = invitation.invitation_versions?.find((v: { is_published: boolean, invitation_data: any }) => v.is_published) || invitation.invitation_versions?.[0];
   const invData = activeVersion?.invitation_data || {};
 
+  const { entitlements } = await getInvitationEntitlements(p.id);
+
   return (
     <div className="min-h-screen bg-[#FAF8F3]" dir="rtl">
       <ShareClient 
@@ -71,6 +74,7 @@ export default async function SharePage({ params }: { params: Promise<{ id: stri
         paymentStatus={order?.status || null}
         publicUrl={publicUrl}
         expiresAt={invitation.expires_at}
+        entitlements={entitlements}
       />
     </div>
   );

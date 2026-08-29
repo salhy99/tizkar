@@ -10,6 +10,7 @@ import {
   buildTelegramShareUrl, 
   sanitizeFilenameSlug 
 } from '@/lib/utils/share';
+import { FeatureGate } from '@/components/ui/FeatureGate';
 
 type ShareClientProps = {
   invitationId: string;
@@ -21,6 +22,7 @@ type ShareClientProps = {
   paymentStatus: string | null;
   publicUrl: string;
   expiresAt: string | null;
+  entitlements: import('@/lib/entitlements').PackageEntitlements;
 };
 
 export default function ShareClient({
@@ -32,7 +34,8 @@ export default function ShareClient({
   status,
   paymentStatus,
   publicUrl,
-  expiresAt
+  expiresAt,
+  entitlements
 }: ShareClientProps) {
   const router = useRouter();
   const [copied, setCopied] = useState(false);
@@ -227,21 +230,29 @@ export default function ShareClient({
           <div className="w-full max-w-xl bg-white rounded-2xl shadow-sm border border-border p-6 space-y-4 lg:mt-8 flex flex-col items-center">
             <h3 className="font-bold border-b border-border w-full pb-2 text-center">صورة ستوري (إنستغرام / سناب شات)</h3>
             <p className="text-xs text-muted-foreground text-center">قم بتحميل الصورة لمشاركتها كقصة في حساباتك</p>
-            <Button 
-              variant="default"
-              className="bg-primary text-white"
-              onClick={() => {
-                const safeSlug = sanitizeFilenameSlug(slug);
-                const a = document.createElement('a');
-                a.href = `/api/invitations/${invitationId}/story`;
-                a.download = `tizkar-${safeSlug}-story.png`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-              }}
+            
+            <FeatureGate 
+              isLocked={!entitlements.storyExport}
+              featureName="تصدير ستوري"
+              requiredPackage="Plus"
+              invitationId={invitationId}
             >
-              تحميل صورة الستوري (1080x1920)
-            </Button>
+              <Button 
+                variant="default"
+                className="bg-primary text-white"
+                onClick={() => {
+                  const safeSlug = sanitizeFilenameSlug(slug);
+                  const a = document.createElement('a');
+                  a.href = `/api/invitations/${invitationId}/story`;
+                  a.download = `tizkar-${safeSlug}-story.png`;
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                }}
+              >
+                تحميل صورة الستوري (1080x1920)
+              </Button>
+            </FeatureGate>
           </div>
         )}
       </main>

@@ -2,8 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect, notFound } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import PlanSelectionClient from './PlanSelectionClient'
-
 import { requireInvitationEditAccess } from '@/lib/auth/invitation-auth'
+import { getInvitationEntitlements } from '@/lib/entitlements/server'
 
 export default async function PlansPage({ params }: { params: Promise<{ invitationId: string }> }) {
   const p = await params
@@ -53,6 +53,8 @@ export default async function PlansPage({ params }: { params: Promise<{ invitati
     .eq('status', 'ACTIVE')
     .order('display_order', { ascending: true });
 
+  const entitlementsState = await getInvitationEntitlements(p.invitationId);
+
   return (
     <div className="min-h-screen bg-[#FAF8F3] py-16 px-4" dir="rtl">
       <div className="container mx-auto max-w-5xl">
@@ -62,7 +64,7 @@ export default async function PlansPage({ params }: { params: Promise<{ invitati
         </div>
         
         {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-        <PlanSelectionClient invitationId={p.invitationId} plans={(plans as any) || []} />
+        <PlanSelectionClient invitationId={p.invitationId} plans={(plans as any) || []} currentPlanName={entitlementsState.planName} />
       </div>
     </div>
   )

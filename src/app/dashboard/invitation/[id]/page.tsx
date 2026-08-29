@@ -3,6 +3,7 @@ import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { DashboardHeader } from "../../components/DashboardHeader";
 import InvitationDashboardClient from "./InvitationDashboardClient";
+import { getInvitationEntitlements } from "@/lib/entitlements/server";
 
 export default async function InvitationDashboardPage({ params }: { params: Promise<{ id: string }> }) {
   const p = await params;
@@ -80,6 +81,8 @@ export default async function InvitationDashboardPage({ params }: { params: Prom
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const totalGuests = confirmed.reduce((acc: number, curr: any) => acc + 1 + (curr.companions || 0), 0);
 
+  const entitlementsState = await getInvitationEntitlements(p.id);
+
   return (
     <main className="min-h-screen bg-[#FAF8F3]" dir="rtl">
       <DashboardHeader userName={profile?.display_name || user.phone || ""} phone={user.phone!} userId={user.id} />
@@ -120,6 +123,8 @@ export default async function InvitationDashboardPage({ params }: { params: Prom
             totalGuests
           }}
           isExpired={!!isExpired}
+          planName={entitlementsState.planName}
+          entitlements={entitlementsState.entitlements}
         />
       </div>
     </main>

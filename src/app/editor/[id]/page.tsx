@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import EditorClient from "./components/EditorClient";
 import { requireInvitationEditAccess } from "@/lib/auth/invitation-auth";
+import { getInvitationEntitlements } from "@/lib/entitlements/server";
 export const metadata = {
   robots: {
     index: false,
@@ -58,6 +59,8 @@ export default async function EditorPage({ params }: { params: Promise<{ id: str
     .limit(1)
     .single();
 
+  const entitlementsState = await getInvitationEntitlements(p.id);
+
   return (
     <div className="h-screen overflow-hidden bg-[#FAF8F3]" dir="rtl">
       <EditorClient 
@@ -68,6 +71,8 @@ export default async function EditorPage({ params }: { params: Promise<{ id: str
         paymentOrder={order || null}
         hasRecoveryKey={!!invitation.recovery_key_hash}
         templateSlug={invitation.templates?.slug || 'layali'}
+        entitlements={entitlementsState.entitlements}
+        planName={entitlementsState.planName}
       />
     </div>
   );
