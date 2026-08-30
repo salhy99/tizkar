@@ -39,9 +39,14 @@ A selected package does NOT grant entitlements until an order is placed and mark
 - **Expired**: Entitlements do not bypass the expiration date of an invitation.
 
 ## 6. Legacy / Grandfather Behavior & Unknown Packages
-If an invitation has no paid order, or a plan cannot be identified, the system safely falls back to `DEFAULT_ENTITLEMENTS` which mimics `FREE_PREVIEW`. 
-Legacy paid invitations will automatically inherit the capabilities of their assigned package.
-Features like `analytics` and `guestManagementPro` are temporarily enabled globally across all tiers to protect legacy users until a formal business restriction is approved.
+If an invitation has no paid order, or a plan cannot be identified, the system safely falls back to `DEFAULT_ENTITLEMENTS` which mimics `FREE_PREVIEW`.
+
+### Commercial Policy V2 Grandfathering (Phase 8.6)
+To protect existing paid customers, an explicit grandfathering policy was introduced for the Analytics and Guest Management Pro features, which moved to `PLUS`/`PREMIUM` tiers.
+- **Cutoff:** `2026-08-30T12:00:00.000Z`
+- **Qualification:** The system evaluates the `paid_at` timestamp (falling back to `created_at` for very old orders). If a legacy PAID order qualified before the cutoff, the invitation automatically retains `analytics: true` and `guestManagementPro: true`.
+- **Downgrade/Upgrade/Repurchase:** The system evaluates strictly based on the *latest* paid order. If a grandfathered BASIC invitation upgrades to PLUS, or repurchases BASIC after expiry, the newest order dictates the policy (new BASIC loses the grandfather overlay; PLUS natively grants it).
+- **Cross-Invitation:** Grandfathering is scoped strictly to the specific invitation ID and its historical qualifying order.
 
 ## 7. Versioning and Snapshots
 The Entitlement engine uses the LIVE Code Registry matching the `plan.name` string snapshot. If the system's policy rules change tomorrow (e.g., BASIC image limit changes from 10 to 5), the old invitation will immediately adopt the new limits for future operations. No complex database-level capability versioning is implemented yet.
@@ -50,11 +55,11 @@ The Entitlement engine uses the LIVE Code Registry matching the `plan.name` stri
 ## 8. Known Limitations
 **RSVP Limit Concurrency**: The RSVP limitation check in `submitRsvp` counts existing rows and then inserts. This is not strictly atomic. A highly concurrent attack could potentially exceed the RSVP limit by a small margin due to race conditions.
 
-## 9. Current Commercial Policy Matrix Status
+## 9. Current Commercial Policy Matrix Status (Phase 8.6 V2)
 | Capability | FREE_PREVIEW | BASIC | PLUS | PREMIUM | Status |
 |---|---:|---:|---:|---:|---|
-| Analytics | YES | YES | YES | YES | TEMPORARY |
-| Guest Management Pro | YES | YES | YES | YES | TEMPORARY |
+| Analytics | NO | NO | YES | YES | CONFIRMED |
+| Guest Management Pro | NO | NO | YES | YES | CONFIRMED |
 | Premium Templates | NO | NO | NO | YES | CONFIRMED |
 | Max Images | 5 | 10 | 20 | 50 | CONFIRMED |
 | Background Audio | NO | NO | YES | YES | CONFIRMED |
@@ -63,3 +68,7 @@ The Entitlement engine uses the LIVE Code Registry matching the `plan.name` stri
 | Branding Removal | NO | NO | NO | YES | CONFIRMED |
 | Max RSVP Responses | 50 | 100 | 250 | Unlimited | CONFIRMED |
 | Invitation Duration | 120 | 120 | 120 | 120 | CONFIRMED |
+
+## 10. Data Minimization & Ingestion Independence
+- **Guest Data Minimization**: If an owner lacks `guestManagementPro`, `getInvitationRsvps` strictly omits Protected Guest Data (names, messages, etc.) from the server payload. It selects only `attendance_status` and `guest_count` to populate summary aggregates (e.g., total attending count).
+- **Analytics Ingestion**: The `recordAnalyticsEvent` endpoint does *not* check commercial entitlements. It remains universally active to ingest traffic data. This allows an owner who later upgrades to `PLUS` to immediately access historical analytics data.
