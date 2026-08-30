@@ -71,7 +71,7 @@ export async function getInvitationEntitlements(invitationId: string): Promise<E
   const COMMERCIAL_POLICY_V2_CUTOFF = new Date('2026-08-30T12:00:00Z');
   
   // Use paid_at if available, otherwise fallback to created_at for older legacy orders
-  const effectivePaidAtStr = (orderData as any).paid_at || orderData.created_at;
+  const effectivePaidAtStr = (orderData as { paid_at?: string }).paid_at || orderData.created_at;
   const orderDate = new Date(effectivePaidAtStr || new Date().toISOString());
   const isGrandfathered = orderDate < COMMERCIAL_POLICY_V2_CUTOFF;
 

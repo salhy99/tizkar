@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation'
 import { getInvitationRsvps } from '@/actions/rsvps'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
-import RsvpListClient from './RsvpListClient'
+import RsvpListClient, { Rsvp } from './RsvpListClient'
 import { FeatureGate } from '@/components/ui/FeatureGate'
 
 export const metadata = {
@@ -32,15 +32,13 @@ export default async function GuestsPage({ params }: { params: Promise<{ id: str
       </div>
     )
   }
-
-  // 3. Compute Metrics
-  const rsvps = res.data
+  const rsvps = (res.data || []) as unknown as Rsvp[]
   const totalResponses = rsvps.length
-  const attendingResponses = rsvps.filter((r: any) => r.attendance_status === 'ATTENDING').length
-  const declinedResponses = rsvps.filter((r: any) => r.attendance_status === 'DECLINED').length
+  const attendingResponses = rsvps.filter((r) => r.attendance_status === 'ATTENDING').length
+  const declinedResponses = rsvps.filter((r) => r.attendance_status === 'DECLINED').length
   const totalExpectedAttendees = rsvps
-    .filter((r: any) => r.attendance_status === 'ATTENDING')
-    .reduce((acc: number, curr: any) => acc + (curr.guest_count || 0), 0)
+    .filter((r) => r.attendance_status === 'ATTENDING')
+    .reduce((acc: number, curr) => acc + (curr.guest_count || 0), 0)
     
   const isLocked = !!res.locked;
 
@@ -82,7 +80,7 @@ export default async function GuestsPage({ params }: { params: Promise<{ id: str
         invitationId={p.id}
       >
         <div className="bg-white rounded-3xl shadow-sm border border-border overflow-hidden">
-          <RsvpListClient initialData={isLocked ? [] : (rsvps as any[])} invitationId={p.id} />
+          <RsvpListClient initialData={isLocked ? [] : rsvps} invitationId={p.id} />
         </div>
       </FeatureGate>
     </div>

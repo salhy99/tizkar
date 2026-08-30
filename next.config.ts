@@ -23,8 +23,8 @@ const nextConfig: NextConfig = {
             value: 'camera=(), microphone=(), geolocation=(), browsing-topics=()',
           },
           {
-            key: 'Content-Security-Policy-Report-Only',
-            value: "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://vercel.live; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://zxrzqyvlydsdczngxxst.supabase.co https://hnjfxdyterpbmkisaiiw.supabase.co; media-src 'self' blob: https://zxrzqyvlydsdczngxxst.supabase.co https://hnjfxdyterpbmkisaiiw.supabase.co; connect-src 'self' https://zxrzqyvlydsdczngxxst.supabase.co https://hnjfxdyterpbmkisaiiw.supabase.co wss://ws-us3.pusher.com; frame-ancestors 'none'; form-action 'self';"
+            key: 'Content-Security-Policy',
+            value: `default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: ${process.env.NEXT_PUBLIC_SUPABASE_URL}; media-src 'self' blob: ${process.env.NEXT_PUBLIC_SUPABASE_URL}; connect-src 'self' ${process.env.NEXT_PUBLIC_SUPABASE_URL}; frame-ancestors 'none'; form-action 'self'; object-src 'none'; base-uri 'self'; font-src 'self';`
           }
         ],
       },

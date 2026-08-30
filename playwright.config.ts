@@ -16,6 +16,13 @@ if (supabaseUrl.includes(PRODUCTION_PROJECT_ID)) {
   process.exit(1);
 }
 
+const baseURL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+if (baseURL.includes('tizkar.vercel.app')) {
+  console.error('\n🚨 FATAL ERROR: Playwright is configured to run against the PRODUCTION application URL.');
+  console.error('Aborting test run to prevent production data corruption.\n');
+  process.exit(1);
+}
+
 if (!supabaseUrl.includes(DEVELOPMENT_PROJECT_ID)) {
   console.warn('\n⚠️ WARNING: Supabase URL does not match known Development Project ID. Running tests anyway.\n');
 }
@@ -32,7 +39,7 @@ export default defineConfig({
   workers: process.env.CI ? 1 : 1, // Limit workers to 1 to prevent DB cross-contamination during E2E
   reporter: 'list',
   use: {
-    baseURL: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+    baseURL: baseURL,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
@@ -43,6 +50,14 @@ export default defineConfig({
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
+    },
+    {
+      name: 'firefox',
+      use: { ...devices['Desktop Firefox'] },
+    },
+    {
+      name: 'webkit',
+      use: { ...devices['Desktop Safari'] },
     },
     {
       name: 'mobile-chrome',

@@ -112,10 +112,10 @@ export async function getInvitationRsvps(invitationId: string) {
   }
 
   if (!hasGuestPro) {
-    return { locked: true, data: (data as any[]) || [] }
+    return { locked: true, data: (data as unknown as Record<string, unknown>[]) || [] }
   }
 
-  return { success: true, data: (data as any[]) || [] }
+  return { success: true, data: (data as unknown as Record<string, unknown>[]) || [] }
 }
 
 export async function deleteRsvp(invitationId: string, rsvpId: string) {

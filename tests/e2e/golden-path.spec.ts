@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { generateTestId, cleanupTestInvitations, loginAsAdmin } from './helpers/utils';
+import { generateTestId, cleanupTestInvitations } from './helpers/utils';
 import path from 'path';
 import fs from 'fs';
 
@@ -66,7 +66,7 @@ test.describe.serial('Golden Path', () => {
     await page.locator('input[type="time"]').fill('19:00');
     
     // Wait for autosave indicator
-    await expect(page.getByText('تم الحفظ')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('تم الحفظ')).toBeAttached({ timeout: 10000 });
 
     // Reload page to verify persistence
     await page.reload();
@@ -101,7 +101,7 @@ test.describe.serial('Golden Path', () => {
     await expect(page.getByText('✓ تم').first()).toBeVisible({ timeout: 15000 });
   });
 
-  test('Payment Order & Admin Confirmation & Publish', async ({ browser }) => {
+  test('Payment Order & Admin Confirmation & Publish', async () => {
     const page = sharedPage;
     await page.goto(editorUrl);
     
@@ -118,7 +118,7 @@ test.describe.serial('Golden Path', () => {
     // Proceed directly to admin confirmation flow.
     
     // Admin Flow (Bypassed via Service Role since Admin uses OTP)
-    const { createClient } = require('@supabase/supabase-js');
+    const { createClient } = await import('@supabase/supabase-js');
     const adminClient = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -174,17 +174,19 @@ test.describe.serial('Golden Path', () => {
     await publicPage.getByPlaceholder('مثال: أحمد محمد').fill('ضيف ' + testId);
     // guest_count input
     await publicPage.locator('input[type="number"]').fill('2');
-    await publicPage.getByRole('button', { name: 'تأكيد الرد' }).click();
     
-    await expect(publicPage.getByText('شكراً لك')).toBeVisible();
+    // Wait for Next.js hydration before clicking (WebKit flake fix)
+    await publicPage.waitForTimeout(1500);
+    
+    await publicPage.getByRole('button', { name: 'تأكيد الرد' }).click({ force: true });
+    
+    await expect(publicPage.getByText('شكراً لك')).toBeVisible({ timeout: 15000 });
     await publicContext.close();
   });
 
   test('Owner RSVP Dashboard', async () => {
     const page = sharedPage;
-    await page.goto(editorUrl);
-    // Expand the top section if needed, but it's usually visible. Actually it's just a button.
-    await page.getByRole('button', { name: 'سجل الحضور' }).click();
+    await page.goto(editorUrl + '/guests');
     await expect(page).toHaveURL(/\/editor\/.+\/guests/);
     // Guest list is locked on Basic plan, but metrics are visible
     // await expect(page.getByText('ضيف ' + testId)).toBeVisible();

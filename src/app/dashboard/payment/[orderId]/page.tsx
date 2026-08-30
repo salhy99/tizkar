@@ -1,4 +1,3 @@
-import { createClient } from '@/lib/supabase/server'
 import { redirect, notFound } from 'next/navigation'
 import { requireInvitationEditAccess } from '@/lib/auth/invitation-auth'
 import PaymentClient from './PaymentClient'

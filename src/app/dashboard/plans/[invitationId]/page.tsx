@@ -1,4 +1,3 @@
-import { createClient } from '@/lib/supabase/server'
 import { redirect, notFound } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import PlanSelectionClient from './PlanSelectionClient'
