@@ -4,6 +4,7 @@ import { getInvitationRsvps } from '@/actions/rsvps'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import RsvpListClient from './RsvpListClient'
+import { FeatureGate } from '@/components/ui/FeatureGate'
 
 export const metadata = {
   robots: {
@@ -22,9 +23,9 @@ export default async function GuestsPage({ params }: { params: Promise<{ id: str
   }
 
   // 2. Fetch RSVPs
-  const { data: rsvps, error } = await getInvitationRsvps(p.id)
+  const res = await getInvitationRsvps(p.id)
 
-  if (error || !rsvps) {
+  if (res.error || !res.data) {
     return (
       <div className="p-8 text-center text-red-500 font-bold">
         حدث خطأ أثناء تحميل سجل الحضور.
@@ -33,12 +34,15 @@ export default async function GuestsPage({ params }: { params: Promise<{ id: str
   }
 
   // 3. Compute Metrics
+  const rsvps = res.data
   const totalResponses = rsvps.length
-  const attendingResponses = rsvps.filter(r => r.attendance_status === 'ATTENDING').length
-  const declinedResponses = rsvps.filter(r => r.attendance_status === 'DECLINED').length
+  const attendingResponses = rsvps.filter((r: any) => r.attendance_status === 'ATTENDING').length
+  const declinedResponses = rsvps.filter((r: any) => r.attendance_status === 'DECLINED').length
   const totalExpectedAttendees = rsvps
-    .filter(r => r.attendance_status === 'ATTENDING')
-    .reduce((acc, curr) => acc + (curr.guest_count || 0), 0)
+    .filter((r: any) => r.attendance_status === 'ATTENDING')
+    .reduce((acc: number, curr: any) => acc + (curr.guest_count || 0), 0)
+    
+  const isLocked = !!res.locked;
 
   return (
     <div className="container mx-auto max-w-4xl p-4 md:p-8 space-y-8" dir="rtl">
@@ -71,9 +75,16 @@ export default async function GuestsPage({ params }: { params: Promise<{ id: str
         </div>
       </div>
 
-      <div className="bg-white rounded-3xl shadow-sm border border-border overflow-hidden">
-        <RsvpListClient initialData={rsvps} invitationId={p.id} />
-      </div>
+      <FeatureGate 
+        isLocked={isLocked}
+        featureName="إدارة الضيوف المتقدمة"
+        requiredPackage="Plus"
+        invitationId={p.id}
+      >
+        <div className="bg-white rounded-3xl shadow-sm border border-border overflow-hidden">
+          <RsvpListClient initialData={isLocked ? [] : (rsvps as any[])} invitationId={p.id} />
+        </div>
+      </FeatureGate>
     </div>
   )
 }

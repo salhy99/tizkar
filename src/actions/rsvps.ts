@@ -93,24 +93,29 @@ export async function getInvitationRsvps(invitationId: string) {
   
   const { requireInvitationFeature } = await import('@/lib/entitlements/server')
   const hasGuestPro = await requireInvitationFeature(invitationId, 'guestManagementPro')
-  if (!hasGuestPro) return { error: 'هذه الميزة غير متاحة في باقتك الحالية' }
 
   // 2. Fetch using Service Role
   const { createClient: createAdminClient } = await import('@supabase/supabase-js')
   const adminClient = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
-  const { data, error } = await adminClient
+  const query = adminClient
     .from('invitation_rsvps')
-    .select('*')
+    .select(hasGuestPro ? '*' : 'attendance_status, guest_count')
     .eq('invitation_id', invitationId)
-    .order('created_at', { ascending: false })
+    .order('created_at', { ascending: false });
+
+  const { data, error } = await query;
 
   if (error) {
     console.error('Fetch RSVPs Error:', error)
     return { error: 'حدث خطأ أثناء جلب الردود' }
   }
 
-  return { success: true, data }
+  if (!hasGuestPro) {
+    return { locked: true, data: (data as any[]) || [] }
+  }
+
+  return { success: true, data: (data as any[]) || [] }
 }
 
 export async function deleteRsvp(invitationId: string, rsvpId: string) {

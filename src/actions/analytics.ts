@@ -90,7 +90,7 @@ export async function getAnalyticsMetrics(invitationId: string) {
 
   const { requireInvitationFeature } = await import('@/lib/entitlements/server')
   const hasAnalytics = await requireInvitationFeature(invitationId, 'analytics')
-  if (!hasAnalytics) return { error: 'هذه الميزة غير متاحة في باقتك الحالية' }
+  if (!hasAnalytics) return { locked: true }
 
   const adminClient = createClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

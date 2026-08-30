@@ -37,6 +37,7 @@ export async function getInvitationEntitlements(invitationId: string): Promise<E
     .select(`
       status,
       created_at,
+      paid_at,
       plans (
         name
       )
@@ -62,11 +63,29 @@ export async function getInvitationEntitlements(invitationId: string): Promise<E
     ? orderData.plans[0]?.name 
     : orderData.plans?.name;
 
+  const baseEntitlements = getPackageEntitlements(planName);
+  
+  // Phase 8.6 Grandfathering:
+  // Invitations PAID before this precise release cutoff retain Analytics and Guest Management
+  // even if they were on BASIC.
+  const COMMERCIAL_POLICY_V2_CUTOFF = new Date('2026-08-30T12:00:00Z');
+  
+  // Use paid_at if available, otherwise fallback to created_at for older legacy orders
+  const effectivePaidAtStr = (orderData as any).paid_at || orderData.created_at;
+  const orderDate = new Date(effectivePaidAtStr || new Date().toISOString());
+  const isGrandfathered = orderDate < COMMERCIAL_POLICY_V2_CUTOFF;
+
+  const resolvedEntitlements = isGrandfathered ? {
+    ...baseEntitlements,
+    analytics: true,
+    guestManagementPro: true,
+  } : baseEntitlements;
+
   return {
     isPaid: true,
     isPublished: invData.status === 'PUBLISHED',
     planName: planName || 'UNKNOWN',
-    entitlements: getPackageEntitlements(planName),
+    entitlements: resolvedEntitlements,
   };
 }
 

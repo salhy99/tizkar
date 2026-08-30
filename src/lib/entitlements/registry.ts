@@ -22,8 +22,8 @@ export type PackageEntitlements = {
 // until business explicitly locks them.
 export const PACKAGE_REGISTRY: Record<string, PackageEntitlements> = {
   FREE_PREVIEW: {
-    analytics: true, // Preserving existing accessibility
-    guestManagementPro: true, // Preserving existing accessibility
+    analytics: false,
+    guestManagementPro: false,
     premiumTemplates: false,
     removeBranding: false,
     audioAllowed: false,
@@ -34,8 +34,8 @@ export const PACKAGE_REGISTRY: Record<string, PackageEntitlements> = {
     maxGuestResponses: 50,
   },
   BASIC: {
-    analytics: true,
-    guestManagementPro: true,
+    analytics: false,
+    guestManagementPro: false,
     premiumTemplates: false,
     removeBranding: false,
     audioAllowed: false, // Per existing logic: plus/premium only
@@ -73,8 +73,8 @@ export const PACKAGE_REGISTRY: Record<string, PackageEntitlements> = {
 
 // Fallback for unknown plans (safest least-privilege)
 export const DEFAULT_ENTITLEMENTS: PackageEntitlements = {
-  analytics: true, // preserve current behavior
-  guestManagementPro: true, // preserve current behavior
+  analytics: false,
+  guestManagementPro: false,
   premiumTemplates: false,
   removeBranding: false,
   audioAllowed: false,

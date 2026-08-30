@@ -4,6 +4,7 @@ import { getAnalyticsMetrics } from '@/actions/analytics'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import AnalyticsChart from './AnalyticsChart'
+import { FeatureGate } from '@/components/ui/FeatureGate'
 import { Eye, Users, MousePointerClick, Share2, MapPin, CheckCircle } from 'lucide-react'
 
 export const metadata = {
@@ -25,13 +26,26 @@ export default async function AnalyticsPage({ params }: { params: Promise<{ id: 
   // 2. Fetch Analytics
   const res = await getAnalyticsMetrics(p.id)
 
-  if (res.error || !res.metrics) {
+  if (res.error) {
     return (
       <div className="p-8 text-center text-red-500 font-bold" dir="rtl">
         حدث خطأ أثناء تحميل بيانات الإحصائيات.
       </div>
     )
   }
+
+  const isLocked = !!res.locked;
+  
+  // Dummy data for blurred background if locked
+  const metrics = isLocked ? {
+    views: 1250,
+    uniqueVisitors: 840,
+    rsvpResponses: 150,
+    conversionRate: 12,
+    shareActions: 45,
+    mapClicks: 220,
+    timeSeries: []
+  } : res.metrics!;
 
   const {
     views,
@@ -41,10 +55,16 @@ export default async function AnalyticsPage({ params }: { params: Promise<{ id: 
     shareActions,
     mapClicks,
     timeSeries
-  } = res.metrics
+  } = metrics
 
   return (
-    <div className="container mx-auto max-w-5xl p-4 md:p-8 space-y-8" dir="rtl">
+    <FeatureGate 
+      isLocked={isLocked} 
+      featureName="الإحصائيات المتقدمة" 
+      requiredPackage="Plus"
+      invitationId={p.id}
+    >
+      <div className="container mx-auto max-w-5xl p-4 md:p-8 space-y-8" dir="rtl">
       <div className="flex items-center justify-between border-b border-border pb-6">
         <div>
           <h1 className="text-3xl font-bold text-[#A88952] mb-2 flex items-center gap-3">
@@ -116,5 +136,6 @@ export default async function AnalyticsPage({ params }: { params: Promise<{ id: 
         تعتمد الإحصائيات على آليات حماية الخصوصية، ولا يتم تتبع المستخدمين خارج هذه المنصة أو تخزين هوياتهم الشخصية لأغراض إحصائية.
       </div>
     </div>
+    </FeatureGate>
   )
 }
