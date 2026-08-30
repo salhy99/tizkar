@@ -2,6 +2,7 @@
 
 import React from 'react'
 import { TemplateRendererProps } from '../types'
+import { TizkarAttribution } from '../TizkarAttribution'
 import GlassCountdown from './components/GlassCountdown'
 import GlassGallery from './components/GlassGallery'
 import GlassMusicPlayer from './components/GlassMusicPlayer'
@@ -442,9 +443,10 @@ export function ModernGlassRenderer({ data, mode = 'public', children }: Templat
           </div>
         )}
 
-        <div style={{ marginTop: 60, fontSize: '0.7rem', color: 'rgba(255,255,255,0.3)', letterSpacing: '2px' }}>
-          تِذكار — دعوات رقمية
-        </div>
+        <TizkarAttribution 
+          show={data.presentation?.showTizkarAttribution !== false} 
+          style={{ marginTop: 60, color: 'rgba(255,255,255,0.4)', letterSpacing: '1px' }} 
+        />
       </section>
 
       {data.music && <GlassMusicPlayer url={data.music.url} type={data.music.type} />}

@@ -31,6 +31,9 @@ export type InvitationData = {
   gallery?: string[];
   coverImage?: string;
   music?: { url?: string; type?: 'YOUTUBE' | 'MP3' };
+  presentation?: {
+    showTizkarAttribution?: boolean;
+  };
 }
 
 export type TemplateMode = 'public' | 'editor-preview'

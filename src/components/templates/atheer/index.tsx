@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react'
 import { TemplateRendererProps } from '../types'
+import { TizkarAttribution } from '../TizkarAttribution'
 import { getMediaUrl } from '../../../lib/media-helpers'
 
 /* ─── Intersection-based reveal ────────────────────────────────────────────── */
@@ -455,7 +456,11 @@ export function AtheerRenderer({ data, children }: TemplateRendererProps) {
                 {data.contact.name ? `تواصل مع ${data.contact.name}` : 'تواصل معنا'}
               </a>
             )}
-            <div className="mt-16 text-xs" style={{ color: 'rgba(30,25,20,0.3)' }}>تِذكار — دعوة تبقى بالذكرى</div>
+            <TizkarAttribution 
+              show={data.presentation?.showTizkarAttribution !== false} 
+              className="mt-16"
+              style={{ color: 'rgba(30,25,20,0.3)' }}
+            />
           </div>
         </Reveal>
       </section>

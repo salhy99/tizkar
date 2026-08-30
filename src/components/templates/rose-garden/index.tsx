@@ -2,6 +2,7 @@
 
 import React from 'react'
 import { TemplateRendererProps } from '../types'
+import { TizkarAttribution } from '../TizkarAttribution'
 import RoseCountdown from './components/RoseCountdown'
 import RoseGallery from './components/RoseGallery'
 import RoseMusicPlayer from './components/RoseMusicPlayer'
@@ -512,9 +513,10 @@ export function RoseGardenRenderer({ data, mode = 'public', children }: Template
             </div>
           )}
 
-          <div style={{ marginTop: 56, fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', letterSpacing: '2px' }}>
-            تِذكار — دعوات رقمية
-          </div>
+          <TizkarAttribution 
+            show={data.presentation?.showTizkarAttribution !== false} 
+            style={{ marginTop: 56, color: 'rgba(255,255,255,0.4)', letterSpacing: '1px' }} 
+          />
         </div>
       </section>
 

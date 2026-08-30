@@ -6,6 +6,7 @@ import Gallery from './components/Gallery'
 import MusicPlayer from './components/MusicPlayer'
 
 import { TemplateRendererProps } from '../types'
+import { TizkarAttribution } from '../TizkarAttribution'
 import { getMediaUrl } from '../../../lib/media-helpers'
 
 export function LayaliRenderer(props: TemplateRendererProps) {
@@ -178,10 +179,10 @@ export function LayaliRenderer(props: TemplateRendererProps) {
           </div>
         )}
         
-        <div className="mt-16 text-xs opacity-50 flex items-center justify-center gap-2">
-          <span>تم التصميم بواسطة</span>
-          <span className="font-bold">تِذكار</span>
-        </div>
+        <TizkarAttribution 
+          show={data.presentation?.showTizkarAttribution !== false} 
+          className="mt-16 text-white/50" 
+        />
       </section>
       
       {/* Music Player */}

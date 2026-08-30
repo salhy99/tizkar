@@ -140,10 +140,14 @@ export async function updateInvitationData(invitationId: string, data: import('@
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
+  // Strip any client-supplied presentation data to prevent tampering
+  const safeData = { ...data };
+  delete safeData.presentation;
+
   // We only allow updating the draft version
   const { data: updatedData, error } = await adminClient
     .from('invitation_versions')
-    .update({ invitation_data: data })
+    .update({ invitation_data: safeData })
     .eq('invitation_id', invitationId)
     .eq('is_published', false)
     .select('id');
@@ -208,9 +212,8 @@ export async function publishInvitationOwner(invitationId: string) {
     .single();
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const templateSlug = Array.isArray((invData?.templates as any)) 
-    ? (invData?.templates as any)[0]?.slug 
-    : (invData?.templates as any)?.slug;
+  const tData = invData?.templates as any;
+  const templateSlug = Array.isArray(tData) ? tData[0]?.slug : tData?.slug;
 
   if (templateSlug) {
     const { getTemplate } = await import('@/components/templates/registry');
@@ -257,10 +260,35 @@ export async function publishInvitationOwner(invitationId: string) {
 
   if (invErr) return { error: 'حدث خطأ أثناء النشر' }
 
+  // Evaluate branding entitlement
+  let showTizkarAttribution = true; // Safe fallback
+  if (templateSlug) {
+    const { requireInvitationFeature } = await import('@/lib/entitlements/server');
+    const canRemoveBranding = await requireInvitationFeature(invitationId, 'removeBranding');
+    showTizkarAttribution = !canRemoveBranding;
+  }
+
+  // Fetch current draft data to inject presentation snapshot
+  const { data: draftVer } = await adminClient
+    .from('invitation_versions')
+    .select('invitation_data')
+    .eq('invitation_id', invitationId)
+    .eq('is_published', false)
+    .single();
+
+  const finalData = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ...((draftVer?.invitation_data as any) || {}),
+    presentation: { showTizkarAttribution }
+  };
+
   // Update version
   const { error: verErr } = await adminClient
     .from('invitation_versions')
-    .update({ is_published: true })
+    .update({ 
+      is_published: true,
+      invitation_data: finalData
+    })
     .eq('invitation_id', invitationId)
     .eq('is_published', false);
 

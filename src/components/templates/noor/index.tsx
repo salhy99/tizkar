@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { TemplateRendererProps } from '../types'
+import { TizkarAttribution } from '../TizkarAttribution'
 import { getMediaUrl } from '../../../lib/media-helpers'
 
 /* ─── Shared Motion Primitive ─────────────────────────────────────────────── */
@@ -405,7 +406,11 @@ export function NoorRenderer({ data, children }: TemplateRendererProps) {
             </a>
           )}
           <div className="mt-12 h-px w-24" style={{ background: `linear-gradient(to right, transparent, ${gold}50, transparent)` }} />
-          <div className="text-xs" style={{ color: `${muted}80` }}>تِذكار — دعوة تبقى بالذكرى</div>
+          <TizkarAttribution 
+            show={data.presentation?.showTizkarAttribution !== false} 
+            className="mt-12"
+            style={{ color: `${muted}80` }}
+          />
         </div>
       </section>
 

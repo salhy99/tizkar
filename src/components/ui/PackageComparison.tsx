@@ -16,6 +16,7 @@ type PackageComparisonProps = {
   currentPlanName?: string;
   onSelectPlan?: (plan: PlanData) => void;
   loadingId?: string | null;
+  requiresPremiumTemplate?: boolean;
 };
 
 const PLAN_RANKS: Record<string, number> = {
@@ -38,7 +39,7 @@ export const packageCopyMap: Record<keyof PackageEntitlements, string> = {
   maxGuestResponses: 'عدد ردود الحضور',
 };
 
-export function PackageComparison({ plans, currentPlanName, onSelectPlan, loadingId }: PackageComparisonProps) {
+export function PackageComparison({ plans, currentPlanName, onSelectPlan, loadingId, requiresPremiumTemplate }: PackageComparisonProps) {
   const currentRank = currentPlanName ? PLAN_RANKS[currentPlanName] ?? -1 : -1;
 
   return (
@@ -93,6 +94,16 @@ export function PackageComparison({ plans, currentPlanName, onSelectPlan, loadin
               <p className="text-sm text-muted-foreground mt-2">
                 {plan.price === 0 ? 'للتجربة والمعاينة فقط قبل النشر' : `يشمل نشر الدعوة لمدة ${entitlements.invitationDurationDays || plan.duration_days} يوماً`}
               </p>
+              {requiresPremiumTemplate && !isPremium && plan.price > 0 && (
+                <div className="mt-3 text-xs font-bold text-red-500 bg-red-50 p-2 rounded border border-red-100">
+                  ⚠️ لن تتمكن من نشر الدعوة بهذه الباقة بدون تغيير القالب الحالي
+                </div>
+              )}
+              {requiresPremiumTemplate && isPremium && (
+                <div className="mt-3 text-xs font-bold text-green-700 bg-green-50 p-2 rounded border border-green-200">
+                  ✓ الباقة المطلوبة لنشر القالب الحالي
+                </div>
+              )}
             </div>
             
             <div className="my-6">
@@ -134,7 +145,15 @@ export function PackageComparison({ plans, currentPlanName, onSelectPlan, loadin
                 <span>{packageCopyMap.analytics}</span>
               </li>
 
-              {/* Branding removal feature omitted until runtime implementation is completed */}
+              <li className={`flex items-start gap-2 ${!entitlements.premiumTemplates ? 'text-muted-foreground opacity-60' : ''}`}>
+                <span className="shrink-0">{entitlements.premiumTemplates ? '✓' : '✗'}</span> 
+                <span>{packageCopyMap.premiumTemplates}</span>
+              </li>
+
+              <li className={`flex items-start gap-2 ${!entitlements.removeBranding ? 'text-muted-foreground opacity-60' : ''}`}>
+                <span className="shrink-0">{entitlements.removeBranding ? '✓' : '✗'}</span> 
+                <span>{packageCopyMap.removeBranding}</span>
+              </li>
             </ul>
             
             {onSelectPlan ? (

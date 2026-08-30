@@ -5,7 +5,17 @@ import { useRouter } from 'next/navigation'
 import { createOrGetPaymentOrder } from '@/actions/payments'
 import { PackageComparison, PlanData } from '@/components/ui/PackageComparison'
 
-export default function PlanSelectionClient({ invitationId, plans, currentPlanName }: { invitationId: string, plans: PlanData[], currentPlanName?: string }) {
+export default function PlanSelectionClient({ 
+  invitationId, 
+  plans, 
+  currentPlanName,
+  requiresPremiumTemplate
+}: { 
+  invitationId: string, 
+  plans: PlanData[], 
+  currentPlanName?: string,
+  requiresPremiumTemplate?: boolean
+}) {
   const router = useRouter()
   const [loadingId, setLoadingId] = useState<string | null>(null)
   const [error, setError] = useState('')
@@ -42,6 +52,7 @@ export default function PlanSelectionClient({ invitationId, plans, currentPlanNa
         currentPlanName={currentPlanName}
         onSelectPlan={handleSelectPlan}
         loadingId={loadingId}
+        requiresPremiumTemplate={requiresPremiumTemplate}
       />
     </div>
   )

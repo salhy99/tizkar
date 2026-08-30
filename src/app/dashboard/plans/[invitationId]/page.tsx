@@ -27,6 +27,25 @@ export default async function PlansPage({ params }: { params: Promise<{ invitati
     .eq('is_published', false)
     .single();
 
+  const { data: invData } = await supabase
+    .from('invitations')
+    .select('templates(slug)')
+    .eq('id', p.invitationId)
+    .single();
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const templateData = invData?.templates as any;
+  const templateSlug = Array.isArray(templateData) ? templateData[0]?.slug : templateData?.slug;
+  
+  let requiresPremiumTemplate = false;
+  if (templateSlug) {
+    const { getTemplate } = await import('@/components/templates/registry');
+    const registryTemplate = getTemplate(templateSlug);
+    if (registryTemplate?.requiredEntitlement === 'premiumTemplates') {
+      requiresPremiumTemplate = true;
+    }
+  }
+
   const activeVersion = activeVersionRaw as { invitation_data?: { groomName?: string, brideName?: string, date?: string, time?: string } } | null;
   const data = activeVersion?.invitation_data || {};
   const isComplete = data.groomName && data.brideName && data.date && data.time;
@@ -63,8 +82,13 @@ export default async function PlansPage({ params }: { params: Promise<{ invitati
           <p className="text-lg text-muted-foreground">قم بترقية مسودتك لتصبح دعوة فعلية قابلة للمشاركة.</p>
         </div>
         
-        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-        <PlanSelectionClient invitationId={p.invitationId} plans={(plans as any) || []} currentPlanName={entitlementsState.planName} />
+        <PlanSelectionClient 
+          invitationId={p.invitationId} 
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          plans={(plans as any) || []} 
+          currentPlanName={entitlementsState.planName} 
+          requiresPremiumTemplate={requiresPremiumTemplate}
+        />
       </div>
     </div>
   )

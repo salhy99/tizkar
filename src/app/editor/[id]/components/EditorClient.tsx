@@ -147,9 +147,17 @@ export default function EditorClient({
             type="text" 
             value={title} 
             onChange={handleTitleChange}
-            className="font-bold text-lg bg-transparent border-none focus:outline-none focus:ring-0 w-32 md:w-64"
+            className="font-bold text-lg bg-transparent border-none focus:outline-none focus:ring-0 w-32 md:w-48"
             placeholder="اسم الدعوة..."
           />
+          {getTemplate(templateSlug)?.requiredEntitlement === 'premiumTemplates' && (
+            <div className="hidden md:flex flex-col gap-0.5 mr-2">
+              <span className="text-[10px] font-bold text-white bg-black px-2 py-0.5 rounded-full w-fit">قالب مميز</span>
+              {!(paymentOrder?.status === 'PAID' && entitlements.premiumTemplates) && (
+                <span className="text-[10px] text-red-500 font-medium">يتطلب Premium للنشر</span>
+              )}
+            </div>
+          )}
         </div>
         
         <div className="flex items-center gap-4">
