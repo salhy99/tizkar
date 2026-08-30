@@ -62,7 +62,7 @@ export default function EditorClient({
     const res = await publishInvitationOwner(invitationId)
     if (res.success) {
       alert('تم نشر الدعوة بنجاح!')
-      router.push('/dashboard')
+      router.push(`/editor/${invitationId}/share`)
     } else {
       alert(res.error || 'حدث خطأ أثناء النشر')
       setPublishing(false)

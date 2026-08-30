@@ -16,10 +16,14 @@ export default async function PaymentPage({ params, searchParams }: { params: Pr
     notFound()
   }
 
-  const supabase = await createClient()
+  const { createClient: createAdminClient } = await import('@supabase/supabase-js');
+  const adminClient = createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
 
   // Fetch Order
-  const { data: orderRaw } = await supabase
+  const { data: orderRaw } = await adminClient
     .from('orders')
     .select('*, invitations(title)')
     .eq('id', p.orderId)

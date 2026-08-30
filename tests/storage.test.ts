@@ -20,7 +20,7 @@ vi.mock('@/lib/auth/invitation-auth', () => {
   }
 })
 
-const mockRemove = vi.fn()
+const mockRemove = vi.fn().mockResolvedValue({ data: {} })
 
 vi.mock('@supabase/supabase-js', () => {
   return {
@@ -127,10 +127,7 @@ describe('deleteMedia Server Action', () => {
     // @ts-expect-error mock
     requireInvitationEditAccess.mockResolvedValue({ user_id: 'user123' })
     
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: false,
-      json: async () => ({ error: 'Storage Error' })
-    })
+    mockRemove.mockResolvedValueOnce({ error: 'Storage Error' })
     
     const res = await deleteMedia('inv123', 'user123/inv123/uuid.jpg')
     

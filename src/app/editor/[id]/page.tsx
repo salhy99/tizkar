@@ -13,8 +13,10 @@ export default async function EditorPage({ params }: { params: Promise<{ id: str
   const p = await params;
   
   // 1. Centralized Dual Authorization Check
-  await requireInvitationEditAccess(p.id);
-  // 2. Fetch invitation and its active version (draft)
+  const authorizedInv = await requireInvitationEditAccess(p.id);
+  if (!authorizedInv) {
+    notFound();
+  }
   // We use the admin client to bypass RLS because the user might be an anonymous token holder.
   // Authorization is already strictly verified above.
   const { createClient: createAdminClient } = await import('@supabase/supabase-js');
@@ -44,7 +46,8 @@ export default async function EditorPage({ params }: { params: Promise<{ id: str
     notFound();
   }
 
-  const draftVersion = invitation.invitation_versions?.find((v: { is_published: boolean }) => !v.is_published);
+  const draftVersion = invitation.invitation_versions?.find((v: { is_published: boolean }) => !v.is_published)
+    || invitation.invitation_versions?.find((v: { is_published: boolean }) => v.is_published);
   
   if (!draftVersion) {
     notFound();

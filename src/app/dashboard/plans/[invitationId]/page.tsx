@@ -18,16 +18,20 @@ export default async function PlansPage({ params }: { params: Promise<{ invitati
     redirect('/dashboard')
   }
 
-  const supabase = await createClient()
+  const { createClient: createAdminClient } = await import('@supabase/supabase-js');
+  const adminClient = createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
 
-  const { data: activeVersionRaw } = await supabase
+  const { data: activeVersionRaw } = await adminClient
     .from('invitation_versions')
     .select('invitation_data')
     .eq('invitation_id', p.invitationId)
     .eq('is_published', false)
     .single();
 
-  const { data: invData } = await supabase
+  const { data: invData } = await adminClient
     .from('invitations')
     .select('templates(slug)')
     .eq('id', p.invitationId)
@@ -66,7 +70,7 @@ export default async function PlansPage({ params }: { params: Promise<{ invitati
   }
 
   // Fetch plans
-  const { data: plans } = await supabase
+  const { data: plans } = await adminClient
     .from('plans')
     .select('*')
     .eq('status', 'ACTIVE')
