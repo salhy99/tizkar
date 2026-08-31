@@ -33,6 +33,7 @@ export class SupabaseStorageSource implements StorageSourceAdapter {
           mime: item.metadata?.mimetype || 'application/octet-stream',
           created_at: item.created_at || new Date().toISOString(),
           updated_at: item.updated_at || new Date().toISOString(),
+          etag: item.metadata?.eTag?.replace(/"/g, '') || undefined,
         });
       }
     }

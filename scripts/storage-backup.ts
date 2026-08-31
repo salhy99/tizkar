@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { SupabaseStorageSource } from '../src/lib/storage/backup/supabase-source';
+import { S3CompatibleDestination } from '../src/lib/storage/backup/s3-destination';
 import { LocalFsDestination } from '../src/lib/storage/backup/local-destination';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -18,11 +19,22 @@ async function runBackup() {
   const supabase = createClient(supabaseUrl, supabaseKey);
   const source = new SupabaseStorageSource(supabase, bucketName);
   
-  // For Phase 10.2-D-A, we use LocalFS as the destination adapter to test the architecture
-  const backupDir = path.join(process.cwd(), '.storage_backup');
-  const destination = new LocalFsDestination(backupDir);
-
-  console.log(`[Backup] Destination: LocalFS (${backupDir})`);
+  let destination;
+  
+  if (process.env.BACKUP_S3_ENDPOINT) {
+    destination = new S3CompatibleDestination(
+      process.env.BACKUP_S3_ENDPOINT,
+      process.env.BACKUP_S3_REGION || 'auto',
+      process.env.BACKUP_S3_ACCESS_KEY_ID!,
+      process.env.BACKUP_S3_SECRET_ACCESS_KEY!,
+      process.env.BACKUP_S3_BUCKET!
+    );
+    console.log(`[Backup] Destination: S3 (${process.env.BACKUP_S3_ENDPOINT}/${process.env.BACKUP_S3_BUCKET})`);
+  } else {
+    const backupDir = path.join(process.cwd(), '.storage_backup');
+    destination = new LocalFsDestination(backupDir);
+    console.log(`[Backup] Destination: LocalFS (${backupDir})`);
+  }
 
   let objectsExamined = 0;
   let objectsCopied = 0;
@@ -46,9 +58,21 @@ async function runBackup() {
         needsCopy = true;
         reason = 'Size mismatch';
       } else {
-        // We could download source to check checksum, but that's expensive.
-        // If size and mime match, we skip for now. Real S3 provides ETag for comparison.
-        needsCopy = false;
+        if (!destObj.checksum && !destObj.etag) {
+          needsCopy = true;
+          reason = 'Missing destination identity';
+        } else {
+          // If size matches and we have identity signals
+          if (obj.etag && destObj.etag && destObj.etag !== obj.etag) {
+            needsCopy = true;
+            reason = 'ETag mismatch';
+          } else if (obj.checksum && destObj.checksum && destObj.checksum !== obj.checksum) {
+            needsCopy = true;
+            reason = 'Checksum mismatch';
+          } else {
+             needsCopy = false; // Identical
+          }
+        }
       }
 
       if (needsCopy) {
