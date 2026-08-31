@@ -2,7 +2,7 @@
 
 import { createClient as createServerClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
-import { requireInvitationLimit, requireInvitationFeature, getInvitationEntitlements } from '@/lib/entitlements/server'
+import { getInvitationEntitlements } from '@/lib/entitlements/server'
 
 const ALLOWED_MIME_TYPES: Record<string, string> = {
   'image/jpeg': 'jpg',
@@ -11,10 +11,6 @@ const ALLOWED_MIME_TYPES: Record<string, string> = {
   'audio/mpeg': 'mp3'
 }
 
-const CATEGORY_LIMITS = {
-  gallery: 20,
-  music: 1
-}
 
 const CATEGORY_MIME_MAP = {
   gallery: ['image/jpeg', 'image/png', 'image/webp'],
@@ -48,50 +44,7 @@ async function verifyAuthAndOwnership(invitationId: string) {
   return { userId: authorizedInv.user_id, supabase }
 }
 
-async function checkQuota(_supabase: unknown, invitationId: string, category: 'gallery' | 'music') {
-  // Fetch latest version data using Admin Client because Editor Session user might be anonymous
-  const adminClient = getAdminClient()
-  const { data: latestVersion, error: verError } = await adminClient
-    .from('invitation_versions')
-    .select('invitation_data')
-    .eq('invitation_id', invitationId)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .single()
-
-  if (verError && verError.code !== 'PGRST116') {
-    throw new Error('Failed to fetch invitation data for quota check')
-  }
-
-  const data = latestVersion?.invitation_data || {}
-  
-  if (category === 'gallery') {
-    const images = Array.isArray(data.gallery) ? data.gallery : []
-    
-    // Check package limit
-    const isWithinLimit = await requireInvitationLimit(invitationId, 'maxImages', images.length + 1)
-    if (!isWithinLimit) {
-      throw new Error(`تم الوصول للحد الأقصى للصور المسموح بها في باقتك الحالية`)
-    }
-    
-    // Also enforce absolute global security bound just in case
-    if (images.length >= CATEGORY_LIMITS.gallery * 3) {
-       throw new Error(`Exceeded absolute platform maximum limit of images`)
-    }
-  } else if (category === 'music') {
-    const hasAudio = await requireInvitationFeature(invitationId, 'audioAllowed')
-    if (!hasAudio) {
-      throw new Error('ميزة الموسيقى الخلفية غير متاحة في باقتك الحالية')
-    }
-
-    // If music already has a valid path string, it's 1. 
-    // Usually music is stored as a string URL or object.
-    const music = typeof data.music === 'string' ? data.music : data.music?.path
-    if (music) {
-      throw new Error(`Exceeded maximum limit of ${CATEGORY_LIMITS.music} audio file`)
-    }
-  }
-}
+// Quota check moved to atomic RPC
 
 export async function createMediaUploadToken(
   invitationId: string,
@@ -100,7 +53,7 @@ export async function createMediaUploadToken(
 ) {
   try {
     // 1. Verify Authentication and Ownership
-    const { userId, supabase } = await verifyAuthAndOwnership(invitationId)
+    const { userId } = await verifyAuthAndOwnership(invitationId)
 
     // 2. Validate Category and MIME type
     if (category !== 'gallery' && category !== 'music') {
@@ -115,17 +68,47 @@ export async function createMediaUploadToken(
       return { success: false, error: 'File type does not match category' }
     }
 
-    // 3. Check Quotas
-    await checkQuota(supabase, invitationId, category)
+    // 3. Atomic Quota Reservation
+    const { getInvitationEntitlements } = await import('@/lib/entitlements/server')
+    const { entitlements } = await getInvitationEntitlements(invitationId)
+    
+    if (category === 'music') {
+      if (!entitlements.audioAllowed) {
+        return { success: false, error: 'ميزة الموسيقى الخلفية غير متاحة في باقتك الحالية' }
+      }
+    }
+
+    const maxLimit = category === 'gallery' ? entitlements.maxImages : 1
+
+    const adminClient = getAdminClient()
+    const { data: resData, error: resError } = await adminClient
+      .rpc('reserve_media_upload_slot', {
+        p_invitation_id: invitationId,
+        p_category: category,
+        p_max_images: maxLimit
+      })
+
+    if (resError) {
+      console.error('Reservation error:', resError)
+      return { success: false, error: 'حدث خطأ أثناء حجز مساحة الرفع' }
+    }
+
+    if (!resData.success) {
+      if (resData.error === 'MEDIA_QUOTA_EXCEEDED') {
+        return { success: false, error: 'تم الوصول للحد الأقصى للصور المسموح بها في باقتك الحالية' }
+      }
+      return { success: false, error: resData.error || 'فشل حجز المساحة' }
+    }
+
+    const reservationId = resData.reservation_id;
 
     // 4. Generate strict path (Dual Path Compatibility: Legacy uses userId, Token-based uses 'anon')
     const extension = ALLOWED_MIME_TYPES[mimeType]
-    const uuid = globalThis.crypto.randomUUID()
+    const uuid = reservationId // Use the reservation UUID as the filename UUID
     const pathPrefix = userId || 'anon'
     const path = `${pathPrefix}/${invitationId}/${uuid}.${extension}`
 
     // 5. Generate Signed Upload URL via Admin Client
-    const adminClient = getAdminClient()
     const { data: uploadData, error: uploadError } = await adminClient
       .storage
       .from('invitations_assets')
@@ -154,7 +137,7 @@ export async function confirmMediaUpload(
 ) {
   try {
     // 1 & 2 & 3. Authenticate and verify ownership
-    const { userId, supabase } = await verifyAuthAndOwnership(invitationId)
+    const { userId } = await verifyAuthAndOwnership(invitationId)
 
     // 4. Validate category
     if (category !== 'gallery' && category !== 'music') {
@@ -240,8 +223,17 @@ export async function confirmMediaUpload(
       return { success: false, error: 'حجم الملف يتجاوز الحد الأقصى المسموح به' }
     }
 
-    // 15. Re-check media quota before final approval
-    await checkQuota(supabase, invitationId, category)
+    // 15. Confirm slot in database
+    const { data: confData, error: confError } = await adminClient
+      .rpc('confirm_media_upload_slot', {
+        p_reservation_id: fileUuid,
+        p_invitation_id: invitationId,
+        p_path: path
+      })
+
+    if (confError || !confData.success) {
+      return { success: false, error: 'حدث خطأ أثناء تأكيد الرفع' }
+    }
 
     // 16. Return the validated raw Storage path
     // We only return success and the safe path. We do NOT return a Signed URL here.
@@ -284,6 +276,12 @@ export async function deleteMedia(invitationId: string, path: string) {
       console.error('Delete Media Error:', removeError)
       return { success: false, error: 'Failed to delete file from storage' }
     }
+    
+    // Also cancel the reservation if it exists
+    await adminClient.rpc('cancel_media_upload_slot', {
+      p_invitation_id: invitationId,
+      p_path: path
+    })
     
     return { success: true }
   } catch (err: unknown) {

@@ -1,7 +1,6 @@
 'use server'
 
 import { requireInvitationEditAccess } from '@/lib/auth/invitation-auth'
-import { requireInvitationLimit } from '@/lib/entitlements/server'
 
 export async function submitRsvp(
   invitationId: string, 
@@ -54,33 +53,32 @@ export async function submitRsvp(
   }
 
   // 3b. Verify Entitlement Limit for RSVP Responses
-  const { count: currentRsvpsCount, error: countError } = await adminClient
-    .from('invitation_rsvps')
-    .select('id', { count: 'exact', head: true })
-    .eq('invitation_id', invitationId)
-
-  if (countError) return { error: 'حدث خطأ أثناء فحص البيانات' }
+  const { getInvitationEntitlements } = await import('@/lib/entitlements/server')
+  const { entitlements } = await getInvitationEntitlements(invitationId)
   
-  const isWithinLimit = await requireInvitationLimit(invitationId, 'maxGuestResponses', (currentRsvpsCount || 0) + 1)
-  
-  if (!isWithinLimit) {
-    return { error: 'عذراً، لا يمكن تسجيل الحضور حيث وصلت هذه الدعوة إلى الحد الأقصى من الردود المسموحة للباقة الحالية.' }
-  }
+  const maxRsvps = entitlements.maxGuestResponses === null ? -1 : entitlements.maxGuestResponses
 
-  // 4. Narrow Insert using Service Role
-  const { error: insertError } = await adminClient
-    .from('invitation_rsvps')
-    .insert({
-      invitation_id: invitationId,
-      guest_name: name,
-      attendance_status: status,
-      guest_count: count,
-      message: message === '' ? null : message
+  // 4. Atomic Quota Enforcement and Insert
+  const { data: resData, error: resError } = await adminClient
+    .rpc('submit_invitation_rsvp_atomic', {
+      p_invitation_id: invitationId,
+      p_guest_name: name,
+      p_attendance_status: status,
+      p_guest_count: count,
+      p_message: message === '' ? null : message,
+      p_max_rsvps: maxRsvps
     })
 
-  if (insertError) {
-    console.error('RSVP Insert Error:', insertError)
+  if (resError) {
+    console.error('RSVP RPC Error:', resError)
     return { error: 'حدث خطأ أثناء تسجيل الرد. الرجاء المحاولة لاحقاً.' }
+  }
+
+  if (!resData.success) {
+    if (resData.error === 'RSVP_QUOTA_EXCEEDED') {
+      return { error: 'عذراً، لا يمكن تسجيل الحضور حيث وصلت هذه الدعوة إلى الحد الأقصى من الردود المسموحة للباقة الحالية.' }
+    }
+    return { error: resData.error || 'حدث خطأ أثناء تسجيل الرد.' }
   }
 
   return { success: true }

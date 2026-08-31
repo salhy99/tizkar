@@ -29,7 +29,8 @@ vi.mock('@supabase/supabase-js', () => {
         from: vi.fn(() => ({
           remove: mockRemove
         }))
-      }
+      },
+      rpc: vi.fn().mockResolvedValue({ data: { success: true }, error: null })
     }))
   }
 })

@@ -166,6 +166,11 @@ export async function updateInvitationData(invitationId: string, data: import('@
     return { error: 'Failed to update' }
   }
 
+  // Release confirmed media slots
+  await adminClient.rpc('release_confirmed_media_slots', {
+    p_invitation_id: invitationId
+  })
+
   return { success: true }
 }
 
