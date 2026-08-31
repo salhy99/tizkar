@@ -186,7 +186,8 @@ test.describe.serial('Golden Path', () => {
     // Wait for Next.js hydration before clicking (WebKit flake fix)
     await publicPage.waitForSelector('#rsvp[data-hydrated="true"]', { timeout: 15000 });
     
-    await publicPage.getByRole('button', { name: 'تأكيد الرد' }).click({ force: true });
+    await publicPage.waitForTimeout(500);
+    await publicPage.getByRole('button', { name: 'تأكيد الرد' }).click();
     
     await expect(publicPage.getByText('شكراً لك')).toBeVisible({ timeout: 15000 });
     await publicContext.close();
