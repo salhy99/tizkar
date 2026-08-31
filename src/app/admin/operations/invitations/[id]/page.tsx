@@ -158,15 +158,51 @@ export default async function AdminInvitationDetailsPage({
 
         {/* Support Notes */}
         <div className="bg-white p-6 rounded-lg shadow">
-          <h2 className="text-lg font-bold mb-4 border-b pb-2">ملاحظات الدعم (Support Notes)</h2>
-          <div className="text-slate-500 text-sm mb-4">
-            (لم يتم إضافة ملاحظات داخلية بعد. الرجاء عدم كتابة بيانات الدفع أو كلمات المرور هنا).
+          <div className="flex justify-between items-center mb-4 border-b pb-2">
+            <h2 className="text-lg font-bold">تذاكر الدعم (Support Cases)</h2>
+            <Link href={`/admin/operations/support/new?invitation_id=${inv.id}${order ? `&order_id=${order.id}` : ''}`} className="text-xs bg-amber-500 hover:bg-amber-600 text-white px-3 py-1 rounded">
+              إنشاء تذكرة
+            </Link>
           </div>
-          <button disabled className="w-full bg-slate-100 text-slate-400 py-2 rounded border border-slate-200 cursor-not-allowed">
-            إضافة ملاحظة (قريباً)
-          </button>
+          
+          <SupportCasesList invitationId={inv.id} />
         </div>
       </div>
+    </div>
+  )
+}
+
+async function SupportCasesList({ invitationId }: { invitationId: string }) {
+  const adminClient = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+
+  const { data: cases } = await adminClient
+    .from('support_cases')
+    .select('id, subject, status, priority, last_activity_at')
+    .eq('invitation_id', invitationId)
+    .order('last_activity_at', { ascending: false })
+
+  if (!cases || cases.length === 0) {
+    return <div className="text-slate-500 text-sm">لا توجد تذاكر دعم فني مفتوحة لهذه الدعوة.</div>
+  }
+
+  return (
+    <div className="space-y-3">
+      {cases.map((c: any) => (
+        <div key={c.id} className="border p-3 rounded-lg flex justify-between items-center text-sm">
+          <div>
+            <div className="font-semibold text-slate-800">{c.subject}</div>
+            <div className="text-slate-500 text-xs mt-1">
+              {c.status} • {c.priority} • {new Date(c.last_activity_at).toLocaleDateString('ar-SA')}
+            </div>
+          </div>
+          <Link href={`/admin/operations/support/${c.id}`} className="text-amber-600 hover:underline">
+            عرض
+          </Link>
+        </div>
+      ))}
     </div>
   )
 }
