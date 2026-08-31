@@ -1,0 +1,61 @@
+export const FUNNEL_EVENTS = {
+  LANDING_VIEW: 'FUNNEL_LANDING_VIEW',
+  TEMPLATE_CATALOG_VIEW: 'FUNNEL_TEMPLATE_CATALOG_VIEW',
+  TEMPLATE_DETAIL_VIEW: 'FUNNEL_TEMPLATE_DETAIL_VIEW',
+  TEMPLATE_SELECTED: 'FUNNEL_TEMPLATE_SELECTED',
+  DRAFT_CREATED: 'FUNNEL_DRAFT_CREATED',
+  EDITOR_OPENED: 'FUNNEL_EDITOR_OPENED',
+  EDITOR_EDITED: 'FUNNEL_EDITOR_EDITED',
+  PACKAGE_VIEWED: 'FUNNEL_PACKAGE_VIEWED',
+  PACKAGE_SELECTED: 'FUNNEL_PACKAGE_SELECTED',
+  PAYMENT_ORDER_CREATED: 'FUNNEL_PAYMENT_ORDER_CREATED',
+  WHATSAPP_CLICKED: 'FUNNEL_WHATSAPP_CLICKED',
+  PAYMENT_CONFIRMED: 'FUNNEL_PAYMENT_CONFIRMED',
+  PUBLISH_ATTEMPTED: 'FUNNEL_PUBLISH_ATTEMPTED',
+  PUBLISHED: 'FUNNEL_PUBLISHED',
+} as const;
+
+export type FunnelEventName = typeof FUNNEL_EVENTS[keyof typeof FUNNEL_EVENTS];
+
+export const VALID_DEVICE_CLASSES = ['mobile', 'tablet', 'desktop', 'unknown'] as const;
+export type DeviceClass = typeof VALID_DEVICE_CLASSES[number];
+
+export const CLIENT_ALLOWED_EVENTS: FunnelEventName[] = [
+  FUNNEL_EVENTS.LANDING_VIEW,
+  FUNNEL_EVENTS.TEMPLATE_CATALOG_VIEW,
+  FUNNEL_EVENTS.TEMPLATE_DETAIL_VIEW,
+  FUNNEL_EVENTS.TEMPLATE_SELECTED,
+  FUNNEL_EVENTS.EDITOR_OPENED,
+  FUNNEL_EVENTS.EDITOR_EDITED,
+  FUNNEL_EVENTS.PACKAGE_VIEWED,
+  FUNNEL_EVENTS.PACKAGE_SELECTED,
+  FUNNEL_EVENTS.WHATSAPP_CLICKED,
+  FUNNEL_EVENTS.PUBLISH_ATTEMPTED,
+];
+
+export const SERVER_TRUSTED_EVENTS: FunnelEventName[] = [
+  FUNNEL_EVENTS.DRAFT_CREATED,
+  FUNNEL_EVENTS.PAYMENT_ORDER_CREATED,
+  FUNNEL_EVENTS.PAYMENT_CONFIRMED,
+  FUNNEL_EVENTS.PUBLISHED,
+];
+
+export interface BaseFunnelEvent {
+  eventName: FunnelEventName;
+  sessionId: string;
+  deviceClass?: DeviceClass;
+  sourcePage?: string;
+  invitationId?: string;
+  templateSlug?: string;
+  packageCode?: string;
+  eventKey?: string;
+  isSynthetic?: boolean;
+}
+
+export function isValidFunnelEvent(event: string): event is FunnelEventName {
+  return Object.values(FUNNEL_EVENTS).includes(event as FunnelEventName);
+}
+
+export function isClientAllowedEvent(event: FunnelEventName): boolean {
+  return CLIENT_ALLOWED_EVENTS.includes(event);
+}

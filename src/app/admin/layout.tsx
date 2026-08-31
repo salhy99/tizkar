@@ -50,6 +50,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           <Link href="/admin/users" className="block px-4 py-3 rounded-xl hover:bg-gray-50 text-[#1C1C1C] transition-colors">
             المستخدمين
           </Link>
+          <Link href="/admin/funnel" className="block px-4 py-3 rounded-xl hover:bg-gray-50 text-[#1C1C1C] transition-colors">
+            مسار التحويل (Funnel)
+          </Link>
           <Link href="/dashboard" className="block px-4 py-3 rounded-xl hover:bg-gray-50 text-muted-foreground transition-colors mt-8">
             العودة للمنصة
           </Link>

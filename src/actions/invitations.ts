@@ -107,6 +107,15 @@ export async function createInvitation(templateId: string) {
   // 8. Immediately establish the Editor Session cookie
   await setEditorSession(invitation.id, editToken);
 
+  // 8.5 Track product funnel milestone
+  const { trackServerFunnelEvent } = await import('@/lib/funnel/server');
+  await trackServerFunnelEvent({
+    eventName: 'FUNNEL_DRAFT_CREATED',
+    invitationId: invitation.id,
+    templateSlug: template.slug,
+    eventKey: `draft_created:${invitation.id}`
+  });
+
   // 9. Return success with the token and recovery key so the client can display the secret link ONCE
   return { success: true, invitationId: invitation.id, editToken, recoveryKey };
 }
@@ -293,6 +302,14 @@ export async function publishInvitationOwner(invitationId: string) {
     .eq('is_published', false);
 
   if (verErr) return { error: 'حدث خطأ أثناء نشر النسخة' }
+
+  // 14. Track successful publish
+  const { trackServerFunnelEvent } = await import('@/lib/funnel/server');
+  await trackServerFunnelEvent({
+    eventName: 'FUNNEL_PUBLISHED',
+    invitationId: invitationId,
+    eventKey: `published_${invitationId}_${slug}`
+  });
 
   return { success: true, slug }
 }

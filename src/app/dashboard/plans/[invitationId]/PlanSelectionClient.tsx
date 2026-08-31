@@ -4,6 +4,8 @@ import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createOrGetPaymentOrder } from '@/actions/payments'
 import { PackageComparison, PlanData } from '@/components/ui/PackageComparison'
+import { FunnelTracker } from '@/components/funnel/FunnelTracker'
+import { trackFunnelEvent } from '@/lib/funnel/client'
 
 export default function PlanSelectionClient({ 
   invitationId, 
@@ -26,6 +28,8 @@ export default function PlanSelectionClient({
       return
     }
 
+    trackFunnelEvent('FUNNEL_PACKAGE_SELECTED', { invitationId, packageCode: plan.name }, `package_selected_${invitationId}_${plan.name}`)
+
     setLoadingId(plan.id as string)
     setError('')
     
@@ -41,6 +45,7 @@ export default function PlanSelectionClient({
 
   return (
     <div>
+      <FunnelTracker eventName="FUNNEL_PACKAGE_VIEWED" invitationId={invitationId} sourcePage="plans" dedupKey={`package_viewed_${invitationId}`} />
       {error && (
         <div className="bg-destructive/10 text-destructive border border-destructive/20 p-4 rounded-xl mb-8 text-center font-bold">
           {error}

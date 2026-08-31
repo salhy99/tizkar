@@ -10,6 +10,8 @@ import { InvitationData } from '@/components/templates/types'
 import { Button } from '@/components/ui/button'
 import { PackageEntitlements } from '@/lib/entitlements'
 import Sidebar from './Sidebar'
+import { FunnelTracker } from '@/components/funnel/FunnelTracker'
+import { trackFunnelEvent } from '@/lib/funnel/client'
 
 export default function EditorClient({ 
   invitationId, 
@@ -53,6 +55,8 @@ export default function EditorClient({
   const completion = calcCompletion()
 
   const handlePublish = async () => {
+    trackFunnelEvent('FUNNEL_PUBLISH_ATTEMPTED', { invitationId }, `publish_attempt_${invitationId}_${Date.now()}`)
+    
     if (completion < 100) {
       alert('يرجى إكمال البيانات الأساسية قبل النشر.')
       return
@@ -93,6 +97,8 @@ export default function EditorClient({
     
     if (res.success) {
       setSaveStatus('SAVED')
+      // Track first edit
+      trackFunnelEvent('FUNNEL_EDITOR_EDITED', { invitationId }, `editor_edited_${invitationId}`)
       setTimeout(() => setSaveStatus('IDLE'), 2000)
     } else {
       setSaveStatus('ERROR')
@@ -136,6 +142,7 @@ export default function EditorClient({
 
   return (
     <div className="flex flex-col h-screen w-full bg-[#FAF8F3]">
+      <FunnelTracker eventName="FUNNEL_EDITOR_OPENED" invitationId={invitationId} sourcePage="editor" dedupKey={`editor_opened_${invitationId}`} />
       {/* Top Action Bar */}
       <header className="h-16 bg-white border-b border-border flex items-center justify-between px-4 lg:px-8 shrink-0 z-10">
         <div className="flex items-center gap-4">

@@ -116,6 +116,14 @@ export async function createOrGetPaymentOrder(invitationId: string, planId: stri
           throw insertError;
         }
 
+        const { trackServerFunnelEvent } = await import('@/lib/funnel/server');
+        await trackServerFunnelEvent({
+          eventName: 'FUNNEL_PAYMENT_ORDER_CREATED',
+          invitationId: invitationId,
+          packageCode: plan.name,
+          eventKey: `payment_order_${newOrder.id}`
+        });
+
         return {
           success: true,
           data: {
@@ -182,7 +190,7 @@ export async function adminConfirmManualPayment(orderId: string) {
 
     const { data: order, error: orderError } = await adminClient
       .from('orders')
-      .select('status, tracking_code')
+      .select('status, tracking_code, invitation_id, plan_snapshot')
       .eq('id', orderId)
       .single()
 
@@ -206,6 +214,45 @@ export async function adminConfirmManualPayment(orderId: string) {
       .eq('id', orderId)
 
     if (updateError) throw updateError
+    
+    // Audit Log
+    try {
+      await adminClient.from('admin_audit_log').insert({
+        admin_user_id: user.id,
+        action: 'PAYMENT_CONFIRMED',
+        entity_type: 'order',
+        entity_id: orderId,
+        metadata: { previous_status: 'PENDING_PAYMENT', new_status: 'PAID', tracking_code: order.tracking_code }
+      })
+    } catch (e) {
+      console.error('[Audit Log] Failed to insert', e)
+    }
+
+    // Best-effort Funnel Telemetry for PAYMENT_CONFIRMED
+    try {
+      // Find the original session_id that created the order
+      const { data: previousEvent } = await adminClient
+        .from('product_funnel_events')
+        .select('session_id')
+        .eq('event_key', `payment_order_${orderId}`)
+        .limit(1)
+        .single();
+        
+      if (previousEvent?.session_id) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const planSnapshot = order.plan_snapshot as any;
+        const { trackServerFunnelEvent } = await import('@/lib/funnel/server');
+        await trackServerFunnelEvent({
+          eventName: 'FUNNEL_PAYMENT_CONFIRMED',
+          sessionId: previousEvent.session_id,
+          invitationId: order.invitation_id,
+          packageCode: planSnapshot?.name,
+          eventKey: `payment_confirmed_${orderId}`
+        });
+      }
+    } catch (e) {
+      console.error('[Funnel] Failed to track payment confirmation telemetry', e)
+    }
 
     return { success: true }
   } catch (err: unknown) {

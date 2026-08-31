@@ -56,18 +56,26 @@ try {
 const fallbackCreateMap = new Map<string, { count: number, resetAt: number }>();
 const fallbackRecoverMap = new Map<string, { count: number, resetAt: number }>();
 
+function isTestMode(): boolean {
+  if (process.env.TIZKAR_E2E_MODE === 'true') {
+    if (process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production' || process.env.NEXT_PUBLIC_SUPABASE_URL?.includes('hnjfxdyterpbmkisaiiw')) {
+      throw new Error("CRITICAL SECURITY: E2E Test Mode cannot be enabled in Production");
+    }
+    return true;
+  }
+  return false;
+}
+
 export async function getClientIp(): Promise<string> {
   const headersList = await headers();
-  // Vercel / Cloudflare standard header
-  const forwardedFor = headersList.get('x-forwarded-for');
-  let ip = '';
+  let ip = headersList.get('x-real-ip');
   
-  if (forwardedFor) {
-    ip = forwardedFor.split(',')[0].trim();
-  } else {
-    const realIp = headersList.get('x-real-ip');
-    if (realIp) {
-      ip = realIp.trim();
+  if (!ip) {
+    const forwardedFor = headersList.get('x-forwarded-for');
+    if (forwardedFor) {
+      // In production, Vercel guarantees x-real-ip. If missing, fallback to left-most 
+      // assuming Vercel overwrites, but x-real-ip is the safest. No arbitrary client bypass allowed.
+      ip = forwardedFor.split(',')[0].trim();
     }
   }
 
@@ -89,6 +97,10 @@ export async function getClientIp(): Promise<string> {
 }
 
 export async function checkCreationRateLimit(): Promise<{ success: boolean; error?: string }> {
+  if (isTestMode()) {
+    return { success: true };
+  }
+
   const ip = await getClientIp();
 
   if (creationLimiter) {
@@ -126,6 +138,10 @@ export async function checkCreationRateLimit(): Promise<{ success: boolean; erro
 }
 
 export async function checkRecoveryRateLimit(): Promise<{ success: boolean; error?: string }> {
+  if (isTestMode()) {
+    return { success: true };
+  }
+
   const ip = await getClientIp();
 
   if (recoveryLimiter) {
@@ -165,6 +181,9 @@ export async function checkRecoveryRateLimit(): Promise<{ success: boolean; erro
 const fallbackRsvpMap = new Map<string, { count: number, resetAt: number }>();
 
 export async function checkRsvpRateLimit(invitationId: string): Promise<{ success: boolean; error?: string }> {
+  if (isTestMode()) {
+    return { success: true };
+  }
   const ip = await getClientIp();
   const key = `${ip}:${invitationId}`; // specific to invitation
 
@@ -201,6 +220,9 @@ export async function checkRsvpRateLimit(invitationId: string): Promise<{ succes
 }
 
 export async function checkAnalyticsRateLimit(invitationId: string): Promise<{ success: boolean; drop?: boolean; error?: string }> {
+  if (isTestMode()) {
+    return { success: true };
+  }
   const ip = await getClientIp();
   const key = `${ip}:${invitationId}`; 
 

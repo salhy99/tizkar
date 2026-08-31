@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import PreviewButton from "./PreviewButton";
+import { FunnelTracker } from "@/components/funnel/FunnelTracker";
+import { TemplateSelectAction } from "./TemplateSelectAction";
 
 export default async function TemplateDetailPage({
   params,
@@ -27,6 +29,7 @@ export default async function TemplateDetailPage({
 
   return (
     <main className="min-h-screen bg-[#FAF8F3] py-12">
+      <FunnelTracker eventName="FUNNEL_TEMPLATE_DETAIL_VIEW" templateSlug={template.slug} sourcePage="template_detail" dedupKey={`template_detail_${template.slug}`} />
       <div className="container mx-auto px-4 max-w-6xl">
         {/* Header */}
         <div className="mb-8 border-b border-border pb-6 flex items-center justify-between">
@@ -114,11 +117,7 @@ export default async function TemplateDetailPage({
             </div>
 
             <div className="flex flex-col gap-4 pt-4">
-              <Link href={`/dashboard/create?template=${template.id}`}>
-                <Button size="lg" className="w-full h-14 text-lg bg-primary hover:bg-primary/90 text-white rounded-2xl shadow-xl shadow-primary/20">
-                  استخدم هذا القالب
-                </Button>
-              </Link>
+              <TemplateSelectAction templateId={template.id} slug={template.slug} />
               {/* Fake preview button just to satisfy Free Preview requirement loosely */}
               <PreviewButton />
             </div>

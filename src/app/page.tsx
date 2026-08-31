@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { PackageComparison } from "@/components/ui/PackageComparison";
 import { createClient } from "@/lib/supabase/server";
+import { FunnelTracker } from "@/components/funnel/FunnelTracker";
 
 export default async function Home() {
   const supabase = await createClient();
@@ -12,6 +13,7 @@ export default async function Home() {
     .order('display_order', { ascending: true });
   return (
     <main className="flex min-h-screen flex-col items-center">
+      <FunnelTracker eventName="FUNNEL_LANDING_VIEW" sourcePage="landing" dedupKey="landing_view" />
       {/* Navbar Placeholder */}
       <header className="w-full border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-50">
         <div className="container mx-auto px-4 h-20 flex items-center justify-between">

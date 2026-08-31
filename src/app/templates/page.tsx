@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { PremiumBadge } from "@/components/ui/PremiumBadge";
 import { templatesRegistry } from "@/components/templates/registry";
+import { FunnelTracker } from "@/components/funnel/FunnelTracker";
 
 export default async function TemplatesPage({
   searchParams,
@@ -35,6 +36,7 @@ export default async function TemplatesPage({
 
   return (
     <main className="min-h-screen bg-[#FAF8F3] py-12">
+      <FunnelTracker eventName="FUNNEL_TEMPLATE_CATALOG_VIEW" sourcePage="templates" dedupKey="templates_view" />
       <div className="container mx-auto px-4">
         {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-end mb-12 border-b border-border pb-6">
