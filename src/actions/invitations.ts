@@ -154,19 +154,20 @@ export async function updateInvitationData(invitationId: string, data: import('@
   delete safeData.presentation;
 
   // We only allow updating the draft version
+  // We use the atomic RPC to ensure transaction-safe JSONB mutation
   const { data: updatedData, error } = await adminClient
-    .from('invitation_versions')
-    .update({ invitation_data: safeData })
-    .eq('invitation_id', invitationId)
-    .eq('is_published', false)
-    .select('id');
+    .rpc('update_invitation_data_atomic', {
+      p_invitation_id: invitationId,
+      p_new_data: safeData
+    });
 
-  if (error || !updatedData || updatedData.length === 0) {
-    console.error('Update data error or no rows affected', error)
+  if (error || !updatedData || !updatedData.success) {
+    console.error('Update data error or no rows affected', error || updatedData?.error)
     return { error: 'Failed to update' }
   }
 
-  // Release confirmed media slots
+  // Release confirmed media slots - No longer strictly needed for media logic, but kept for legacy coverage.
+  // Actually, media commit cleans up its own reservations now.
   await adminClient.rpc('release_confirmed_media_slots', {
     p_invitation_id: invitationId
   })

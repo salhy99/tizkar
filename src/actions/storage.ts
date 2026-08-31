@@ -223,16 +223,17 @@ export async function confirmMediaUpload(
       return { success: false, error: 'حجم الملف يتجاوز الحد الأقصى المسموح به' }
     }
 
-    // 15. Confirm slot in database
+    // 15. Confirm and Commit slot in database atomically
     const { data: confData, error: confError } = await adminClient
-      .rpc('confirm_media_upload_slot', {
-        p_reservation_id: fileUuid,
+      .rpc('commit_media_upload_atomic', {
         p_invitation_id: invitationId,
-        p_path: path
+        p_reservation_id: fileUuid,
+        p_storage_path: path,
+        p_category: category
       })
 
     if (confError || !confData.success) {
-      return { success: false, error: 'حدث خطأ أثناء تأكيد الرفع' }
+      return { success: false, error: confData?.error || 'حدث خطأ أثناء تأكيد الرفع' }
     }
 
     // 16. Return the validated raw Storage path
