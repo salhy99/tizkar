@@ -33,8 +33,8 @@ test.describe('Funnel E2E', () => {
     await page.waitForTimeout(1000);
 
     // 3. Template Detail View
-    // The first template has "عرض التفاصيل"
-    await page.locator('text=عرض التفاصيل').first().click();
+    // Select Layali specifically as it is active
+    await page.locator('a').filter({ hasText: 'ليالي' }).first().click();
     await page.waitForURL(/\/templates\/.+/);
     await page.waitForTimeout(1000);
 
@@ -55,19 +55,23 @@ test.describe('Funnel E2E', () => {
     // 6. Editor Opened
     await page.waitForTimeout(1000);
 
-    // 7. Editor Edited (trigger autosave by changing title)
-    await page.fill('input[type="text"]', 'Test Invitation Title Edit');
+    // 7. Editor Edited (trigger autosave by changing groomName in sidebar)
+    await page.getByRole('button', { name: 'معلومات المناسبة' }).click();
+    await page.getByPlaceholder('مثال: أحمد محمد').fill('عريس ' + Math.random());
+    await page.getByPlaceholder('مثال: زهراء علي').fill('عروس ' + Math.random());
+    await page.locator('input[type="date"]').fill('2026-10-20');
+    await page.locator('input[type="time"]').fill('19:00');
     // Wait for autosave to complete (SAVING -> SAVED -> IDLE)
-    await page.waitForSelector('text=حفظ التغييرات', { state: 'attached', timeout: 5000 });
+    await expect(page.getByText('تم الحفظ')).toBeAttached({ timeout: 10000 });
     await page.waitForTimeout(3000); // give time for telemetry
 
     // 8. Package Viewed (Click Continue)
-    await page.click('text=حفظ ومتابعة');
+    await page.getByRole('button', { name: 'اختيار الباقة' }).first().click();
     await page.waitForURL(/\/dashboard\/plans\/.+/);
     await page.waitForTimeout(1000);
 
     // 9. Package Selected (Select PLUS)
-    await page.locator('button:has-text("اختيار الباقة")').nth(0).click(); // Basic or Plus
+    await page.getByRole('button', { name: 'ترقية' }).first().click(); // Select a paid plan
 
     // 10. Payment Order Created
     await page.waitForURL(/\/dashboard\/payment\/.+/);
@@ -76,7 +80,9 @@ test.describe('Funnel E2E', () => {
     await page.waitForTimeout(1000);
 
     // 11. WhatsApp Clicked
-    await page.click('text=الدفع عبر واتساب');
+    // The button might not have exactly this text, let's just bypass it since we mock payment confirmation.
+    // Actually, FUNNEL_WHATSAPP_CLICKED is tracked when clicking it. We MUST click it.
+    await page.getByRole('button', { name: /واتساب/i }).first().click();
     await page.waitForTimeout(1000);
 
     // 12. Payment Confirmed (Simulate Admin Action)
@@ -93,7 +99,7 @@ test.describe('Funnel E2E', () => {
     await page.waitForTimeout(1000);
 
     // 13. Publish Attempted
-    await page.click('text=نشر الدعوة');
+    await page.getByRole('button', { name: 'نشر الدعوة الآن' }).click();
     await page.waitForTimeout(3000);
 
     // 14. Published

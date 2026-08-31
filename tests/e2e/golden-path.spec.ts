@@ -159,7 +159,7 @@ test.describe.serial('Golden Path', () => {
     // Actually, ShareCenter has: span with dir-ltr
     const publicUrlSpan = page.locator('span.dir-ltr');
     const fullUrl = await publicUrlSpan.innerText();
-    publicSlug = fullUrl.split('/').pop() || '';
+    publicSlug = fullUrl.trim().split('/').filter(Boolean).pop() || '';
     expect(publicSlug).toBeTruthy();
   });
 
@@ -168,7 +168,13 @@ test.describe.serial('Golden Path', () => {
     const publicPage = await publicContext.newPage();
     
     await publicPage.goto(`/${publicSlug}`);
-    await expect(publicPage.getByText('عريس ' + testId)).toBeVisible();
+    try {
+      await expect(publicPage.getByText('عريس ' + testId).first()).toBeVisible({ timeout: 10000 });
+    } catch (e) {
+      console.log('PUBLIC PAGE URL:', publicPage.url());
+      console.log('PUBLIC PAGE CONTENT:', await publicPage.content());
+      throw e;
+    }
     
     // Submit RSVP
     await publicPage.getByPlaceholder('مثال: أحمد محمد').fill('ضيف ' + testId);
@@ -176,7 +182,7 @@ test.describe.serial('Golden Path', () => {
     await publicPage.locator('input[type="number"]').fill('2');
     
     // Wait for Next.js hydration before clicking (WebKit flake fix)
-    await publicPage.waitForTimeout(1500);
+    await publicPage.waitForSelector('#rsvp[data-hydrated="true"]', { timeout: 15000 });
     
     await publicPage.getByRole('button', { name: 'تأكيد الرد' }).click({ force: true });
     
