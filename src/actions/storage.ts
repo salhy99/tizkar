@@ -278,15 +278,57 @@ export async function deleteMedia(invitationId: string, path: string) {
       return { success: false, error: 'Failed to delete file from storage' }
     }
     
-    // Also cancel the reservation if it exists
+    // Cancel the reservation if it exists
     await adminClient.rpc('cancel_media_upload_slot', {
       p_invitation_id: invitationId,
       p_path: path
     })
     
+    // Atomically remove it from the gallery/music JSONB state
+    const category = path.includes('/gallery/') ? 'gallery' : 'music'; // rudimentary but effective based on our path structure, actually we can just pass category if we want, but let's try both or just pass it in.
+    // Wait, deleteMedia doesn't take category. Let's just pass 'gallery'. If it's music, we pass 'music'.
+    // The path contains the category because we generate it as: `${userId}/${invitationId}/${category}/${uuid}`
+    const detectedCategory = path.includes('/music/') ? 'music' : 'gallery';
+    await adminClient.rpc('remove_media_atomic', {
+      p_invitation_id: invitationId,
+      p_category: detectedCategory,
+      p_path: path
+    })
+
     return { success: true }
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Delete failed'
     return { success: false, error: msg }
   }
 }
+
+export async function reorderGallery(invitationId: string, newGallery: string[]) {
+  try {
+    const { userId } = await verifyAuthAndOwnership(invitationId)
+    const adminClient = getAdminClient()
+    const { error } = await adminClient.rpc('reorder_gallery_atomic', {
+      p_invitation_id: invitationId,
+      p_new_gallery: newGallery
+    })
+    if (error) throw error
+    return { success: true }
+  } catch (err: unknown) {
+    return { success: false, error: 'Failed to reorder' }
+  }
+}
+
+export async function setCoverImage(invitationId: string, path: string | undefined) {
+  try {
+    const { userId } = await verifyAuthAndOwnership(invitationId)
+    const adminClient = getAdminClient()
+    const { error } = await adminClient.rpc('set_cover_atomic', {
+      p_invitation_id: invitationId,
+      p_path: path || null
+    })
+    if (error) throw error
+    return { success: true }
+  } catch (err: unknown) {
+    return { success: false, error: 'Failed to set cover' }
+  }
+}
+

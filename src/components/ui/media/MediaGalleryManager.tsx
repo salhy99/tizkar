@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { createMediaUploadToken, confirmMediaUpload, deleteMedia } from '@/actions/storage'
+import { createMediaUploadToken, confirmMediaUpload, deleteMedia, reorderGallery, setCoverImage } from '@/actions/storage'
 import { Button } from '@/components/ui/button'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core'
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, rectSortingStrategy, useSortable } from '@dnd-kit/sortable'
@@ -90,13 +90,20 @@ export default function MediaGalleryManager({ invitationId, gallery, coverImage,
     }
   }, [queue])
 
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event
     if (over && active.id !== over.id) {
       const oldIndex = gallery.indexOf(active.id as string)
       const newIndex = gallery.indexOf(over.id as string)
-      onChangeGallery(arrayMove(gallery, oldIndex, newIndex))
+      const newArr = arrayMove(gallery, oldIndex, newIndex)
+      onChangeGallery(newArr)
+      await reorderGallery(invitationId, newArr)
     }
+  }
+
+  const handleSetCover = async (path: string) => {
+    onChangeCover(path)
+    await setCoverImage(invitationId, path)
   }
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -262,7 +269,7 @@ export default function MediaGalleryManager({ invitationId, gallery, coverImage,
                 id={path} 
                 path={path} 
                 isCover={coverImage === path}
-                onSetCover={() => onChangeCover(path)}
+                onSetCover={() => handleSetCover(path)}
                 onRemove={() => handleRemoveExisting(path)}
                 disabled={queue.length > 0} // disable reordering while uploading to avoid state conflicts
               />

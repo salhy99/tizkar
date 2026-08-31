@@ -52,7 +52,21 @@ Client browsers maintain **zero authority** over limit evaluations.
 - All requests flow through `src/actions/storage.ts` and `src/actions/rsvps.ts` Server Actions.
 - The server computes exact numerical bounds dynamically using `getInvitationEntitlements()`, injecting the static constraints directly into the RPC layer.
 
-## 5. Security & Access Control
+## 5. Field Ownership Matrix
+
+To prevent the React editor's generic JSON snapshot from overwriting active media mutations during an autosave, TIZKAR explicitly splits Field Ownership into two categories:
+
+| Field | Generic Autosave | Dedicated Server Mutation |
+|---|---|---|
+| title, date, location, text, program | ALLOW | N/A |
+| gallery | DENY (Stripped) | ALLOW (`commit_media_upload_atomic`, `remove_media_atomic`, `reorder_gallery_atomic`) |
+| coverImage | DENY (Stripped) | ALLOW (`set_cover_atomic`) |
+| music | DENY (Stripped) | ALLOW (`commit_media_upload_atomic`, `remove_media_atomic`) |
+| presentation | DENY (Stripped) | N/A (Server lifecycle actions only) |
+
+Both the Node.js API layer and the PostgreSQL database strictly drop the server-owned keys from the generic `update_invitation_data_atomic` JSON patch before executing a top-level `||` JSONB merge.
+
+## 6. Security & Access Control
 
 All functions are strictly isolated from client execution.
 

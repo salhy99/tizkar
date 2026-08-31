@@ -152,6 +152,10 @@ export async function updateInvitationData(invitationId: string, data: import('@
   // Strip any client-supplied presentation data to prevent tampering
   const safeData = { ...data };
   delete safeData.presentation;
+  // Also strip media fields that have dedicated atomic RPCs to avoid stale client overwrites
+  delete safeData.gallery;
+  delete safeData.coverImage;
+  delete safeData.music;
 
   // We only allow updating the draft version
   // We use the atomic RPC to ensure transaction-safe JSONB mutation
