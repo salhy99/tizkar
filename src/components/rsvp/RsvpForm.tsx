@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect } from 'react'
 import { submitRsvp } from '@/actions/rsvps'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -10,6 +10,10 @@ export default function RsvpForm({ invitationId }: { invitationId: string }) {
   const [isPending, startTransition] = useTransition()
   const [status, setStatus] = useState<'IDLE' | 'SUCCESS_ATTENDING' | 'SUCCESS_DECLINED'>('IDLE')
   const [error, setError] = useState('')
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   // Form State
   const [name, setName] = useState('')
@@ -62,7 +66,7 @@ export default function RsvpForm({ invitationId }: { invitationId: string }) {
   }
 
   return (
-    <div className="py-12 px-6 sm:px-8 text-center bg-white rounded-3xl shadow-sm border border-[#A88952]/20 max-w-md mx-auto my-12" id="rsvp">
+    <div className="py-12 px-6 sm:px-8 text-center bg-white rounded-3xl shadow-sm border border-[#A88952]/20 max-w-md mx-auto my-12" id="rsvp" data-hydrated={mounted}>
       <h3 className="text-2xl font-bold text-[#A88952] mb-6">هل ستشاركنا فرحتنا؟</h3>
       
       <form onSubmit={handleSubmit} className="space-y-6 text-right">
