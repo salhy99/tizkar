@@ -101,7 +101,9 @@ async function runDatabaseBackup() {
       dump_size_bytes: stat.size,
       sha256: hash,
       destination: destinationKey,
-      status: 'SUCCESS'
+      status: 'SUCCESS',
+      schema_scope: 'full-forensic',
+      restore_intent: ['application-schema', 'auth-data', 'storage-metadata']
     }
 
     const manifestKey = `tizkar-production/database/${backupId}.manifest.json`
