@@ -63,7 +63,9 @@ test.describe.serial('Golden Path', () => {
     await page.getByPlaceholder('مثال: أحمد محمد').fill('عريس ' + testId);
     await page.getByPlaceholder('مثال: زهراء علي').fill('عروس ' + testId);
     await page.locator('input[type="date"]').fill('2026-10-20');
+    await page.locator('input[type="date"]').blur();
     await page.locator('input[type="time"]').fill('19:00');
+    await page.locator('input[type="time"]').blur();
     
     // Wait for autosave indicator
     await expect(page.getByText('تم الحفظ')).toBeAttached({ timeout: 10000 });
@@ -196,7 +198,7 @@ test.describe.serial('Golden Path', () => {
     await expect(page).toHaveURL(/\/editor\/.+\/guests/);
     // Guest list is locked on Basic plan, but metrics are visible
     // await expect(page.getByText('ضيف ' + testId)).toBeVisible();
-    await expect(page.getByText('2')).toBeVisible(); // guest count
+    await expect(page.getByText('2', { exact: true })).toBeVisible(); // guest count
   });
 
   test('Share Center & OG / Story', async () => {

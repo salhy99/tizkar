@@ -60,7 +60,9 @@ test.describe('Funnel E2E', () => {
     await page.getByPlaceholder('مثال: أحمد محمد').fill('عريس ' + Math.random());
     await page.getByPlaceholder('مثال: زهراء علي').fill('عروس ' + Math.random());
     await page.locator('input[type="date"]').fill('2026-10-20');
+    await page.locator('input[type="date"]').blur();
     await page.locator('input[type="time"]').fill('19:00');
+    await page.locator('input[type="time"]').blur();
     // Wait for autosave to complete (SAVING -> SAVED -> IDLE)
     await expect(page.getByText('تم الحفظ')).toBeAttached({ timeout: 10000 });
     await page.waitForTimeout(3000); // give time for telemetry
