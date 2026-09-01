@@ -45,6 +45,41 @@ export async function createSupportCase(data: {
 
   const supabase = getAdminClient()
 
+  let finalInvitationId = data.invitation_id || null;
+  const finalOrderId = data.order_id || null;
+
+  // 1. Validate Order and Invitation Consistency
+  if (finalOrderId) {
+    const { data: orderData } = await supabase
+      .from('orders')
+      .select('id, invitation_id')
+      .eq('id', finalOrderId)
+      .single()
+
+    if (!orderData) {
+      return { success: false, error: 'SUPPORT_ENTITY_MISMATCH', message: 'Order not found' }
+    }
+    
+    if (finalInvitationId && finalInvitationId !== orderData.invitation_id) {
+      return { success: false, error: 'SUPPORT_ENTITY_MISMATCH', message: 'Order does not belong to this invitation' }
+    }
+    
+    // Auto-derive invitation if missing
+    finalInvitationId = orderData.invitation_id;
+  }
+
+  if (finalInvitationId) {
+    const { data: invData } = await supabase
+      .from('invitations')
+      .select('id')
+      .eq('id', finalInvitationId)
+      .single()
+      
+    if (!invData) {
+      return { success: false, error: 'SUPPORT_ENTITY_MISMATCH', message: 'Invitation not found' }
+    }
+  }
+
   const { data: newCase, error: caseError } = await supabase
     .from('support_cases')
     .insert({
@@ -52,8 +87,8 @@ export async function createSupportCase(data: {
       category: data.category,
       priority: data.priority,
       status: 'OPEN',
-      invitation_id: data.invitation_id || null,
-      order_id: data.order_id || null,
+      invitation_id: finalInvitationId,
+      order_id: finalOrderId,
       created_by_admin_id: null,
       created_by_admin_identifier: admin.user.email,
     })
@@ -67,8 +102,8 @@ export async function createSupportCase(data: {
 
   await logAdminAction('SUPPORT_CASE_CREATED', {
     case_id: newCase.id,
-    invitation_id: data.invitation_id,
-    order_id: data.order_id,
+    invitation_id: finalInvitationId,
+    order_id: finalOrderId,
     category: data.category
   })
 
@@ -85,7 +120,7 @@ export async function createSupportCase(data: {
   }
 
   revalidatePath('/admin/operations/support')
-  if (data.invitation_id) revalidatePath(`/admin/operations/invitations/${data.invitation_id}`)
+  if (finalInvitationId) revalidatePath(`/admin/operations/invitations/${finalInvitationId}`)
   
   return { success: true, case: newCase }
 }
