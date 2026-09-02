@@ -19,23 +19,32 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Install PostgreSQL Client (pg_dump)
+      - name: Install PostgreSQL 17 client
         run: |
-          sudo apt-get update
-          sudo apt-get install -y postgresql-client
+         sudo apt-get update
+         sudo apt-get install -y curl ca-certificates
+         sudo install -d /usr/share/postgresql-common/pgdg
+         sudo curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+         --fail https://www.postgresql.org/media/keys/ACCC4CF8.asc
+         . /etc/os-release
+         echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $VERSION_CODENAME-pgdg main" \
+         | sudo tee /etc/apt/sources.list.d/pgdg.list
+         sudo apt-get update
+         sudo apt-get install -y postgresql-client-17
+         /usr/lib/postgresql/17/bin/pg_dump --version
 
       - name: Execute Database Backup
         run: npx tsx scripts/database-backup.ts
         env:
-          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-          BACKUP_S3_ENDPOINT: ${{ secrets.BACKUP_S3_ENDPOINT }}
-          BACKUP_S3_REGION: ${{ secrets.BACKUP_S3_REGION || 'auto' }}
-          BACKUP_S3_ACCESS_KEY_ID: ${{ secrets.BACKUP_S3_ACCESS_KEY_ID }}
-          BACKUP_S3_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_S3_SECRET_ACCESS_KEY }}
-          BACKUP_S3_BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}
+         PG_DUMP_BIN: /usr/lib/postgresql/17/bin/pg_dump
+         SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+         BACKUP_S3_ENDPOINT: ${{ secrets.BACKUP_S3_ENDPOINT }}
+         BACKUP_S3_ACCESS_KEY_ID: ${{ secrets.BACKUP_S3_ACCESS_KEY_ID }}
+         BACKUP_S3_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_S3_SECRET_ACCESS_KEY }}
+         BACKUP_S3_BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}

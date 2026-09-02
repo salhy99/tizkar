@@ -1,5 +1,5 @@
 import * as dotenv from 'dotenv'
-import { exec } from 'child_process'
+import { execFile } from 'child_process'
 import { promisify } from 'util'
 import * as fs from 'fs'
 import * as path from 'path'
@@ -8,7 +8,7 @@ import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
 
 dotenv.config({ path: '.env.local' })
 
-const execAsync = promisify(exec)
+const execFileAsync = promisify(execFile)
 
 // Validate Env
 const requiredEnvs = [
@@ -40,7 +40,7 @@ async function runDatabaseBackup() {
   const dumpFilename = `${backupId}.dump`
   const dumpPath = path.join(process.cwd(), dumpFilename)
   const startedAt = new Date().toISOString()
-  
+
   console.log(`[DB Backup] Starting backup ${backupId}...`)
 
   try {
@@ -48,10 +48,10 @@ async function runDatabaseBackup() {
     // We mask the URL in logs to prevent secret leak.
     console.log(`[DB Backup] Executing pg_dump...`)
     const pgUrl = process.env.SUPABASE_DB_URL!
-    
+
     // We use the custom format (-Fc) which is compressed and suitable for pg_restore.
     const { stdout, stderr } = await execAsync(`pg_dump -Fc --no-owner --no-acl -f "${dumpPath}" "${pgUrl}"`)
-    
+
     if (stderr && !stderr.includes('warning')) {
       console.warn(`[DB Backup] pg_dump output: ${stderr}`)
     }
@@ -75,7 +75,7 @@ async function runDatabaseBackup() {
     // 3. Upload to R2 Destination
     const destinationKey = `tizkar-production/database/${dumpFilename}`
     console.log(`[DB Backup] Uploading to S3 destination: ${destinationKey}...`)
-    
+
     await s3Client.send(new PutObjectCommand({
       Bucket: process.env.BACKUP_S3_BUCKET!,
       Key: destinationKey,
@@ -87,7 +87,7 @@ async function runDatabaseBackup() {
         'timestamp': startedAt
       }
     }))
-    
+
     console.log(`[DB Backup] Upload complete.`)
 
     // 4. Create and upload Manifest
