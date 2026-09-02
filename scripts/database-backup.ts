@@ -50,7 +50,16 @@ async function runDatabaseBackup() {
     const pgUrl = process.env.SUPABASE_DB_URL!
 
     // We use the custom format (-Fc) which is compressed and suitable for pg_restore.
-    const { stdout, stderr } = await execAsync(`pg_dump -Fc --no-owner --no-acl -f "${dumpPath}" "${pgUrl}"`)
+    const pgDumpBinary = process.env.PG_DUMP_BIN || '/usr/lib/postgresql/17/bin/pg_dump'
+
+    const { stdout, stderr } = await execFileAsync(pgDumpBinary, [
+      '-Fc',
+      '--no-owner',
+      '--no-acl',
+      '-f',
+      dumpPath,
+      pgUrl
+    ])
 
     if (stderr && !stderr.includes('warning')) {
       console.warn(`[DB Backup] pg_dump output: ${stderr}`)
