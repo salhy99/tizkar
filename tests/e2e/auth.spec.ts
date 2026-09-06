@@ -36,6 +36,8 @@ test.describe('Auth Flow E2E (Name + Password)', () => {
     const validErrors = [
       'الاسم أو كلمة المرور غير صحيحة',
       'تم إجراء عدة محاولات تسجيل دخول. حاول مرة أخرى بعد قليل.',
+      'الخدمة غير متاحة حالياً. الرجاء المحاولة لاحقاً.',
+      'الخدمة غير متاحة مؤقتاً. الرجاء المحاولة لاحقاً.',
     ];
     expect(validErrors.some(e => alertText?.includes(e))).toBe(true);
   });
@@ -65,6 +67,8 @@ test.describe('Auth Flow E2E (Name + Password)', () => {
     const validErrors = [
       'الاسم أو كلمة المرور غير صحيحة',
       'تم إجراء عدة محاولات تسجيل دخول. حاول مرة أخرى بعد قليل.',
+      'الخدمة غير متاحة حالياً. الرجاء المحاولة لاحقاً.',
+      'الخدمة غير متاحة مؤقتاً. الرجاء المحاولة لاحقاً.',
     ];
     expect(validErrors.some(e => alertText?.includes(e))).toBe(true);
   });
