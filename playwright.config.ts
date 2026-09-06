@@ -4,6 +4,7 @@ import path from 'path';
 
 // Load .env.local for testing
 dotenv.config({ path: path.resolve(__dirname, '.env.local') });
+process.env.TIZKAR_E2E_MODE = 'true';
 
 // DEVELOPMENT Supabase Project Verification Guard
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
