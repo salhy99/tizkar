@@ -4,6 +4,7 @@ import path from 'path';
 
 // Load .env.local for testing
 dotenv.config({ path: path.resolve(__dirname, '.env.local') });
+process.env.TIZKAR_E2E_MODE = 'true';
 
 // DEVELOPMENT Supabase Project Verification Guard
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
@@ -64,10 +65,5 @@ export default defineConfig({
       use: { ...devices['Pixel 5'] }, // Approximately 390x844
     },
   ],
-  webServer: {
-    command: 'npm run dev',
-    url: 'http://localhost:3000',
-    reuseExistingServer: !process.env.CI,
-    timeout: 120 * 1000,
-  },
+  // webServer disabled as server is already running on port 3000
 });

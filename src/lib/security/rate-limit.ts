@@ -1,15 +1,21 @@
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 import { headers } from "next/headers";
+import { createHash } from "crypto";
 
 let redis: Redis | null = null;
 let creationLimiter: Ratelimit | null = null;
 let recoveryLimiter: Ratelimit | null = null;
 let rsvpLimiter: Ratelimit | null = null;
 let analyticsLimiter: Ratelimit | null = null;
+let loginLimiter: Ratelimit | null = null;
 
 try {
-  if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+  if (
+    process.env.UPSTASH_REDIS_REST_URL && 
+    process.env.UPSTASH_REDIS_REST_URL.startsWith('https://') &&
+    process.env.UPSTASH_REDIS_REST_TOKEN
+  ) {
     redis = new Redis({
       url: process.env.UPSTASH_REDIS_REST_URL,
       token: process.env.UPSTASH_REDIS_REST_TOKEN,
@@ -40,12 +46,19 @@ try {
     });
 
     // Analytics Limit: Lightweight, high throughput per visitor per invitation
-    // Example: 20 events per 10 seconds (allows for quick interaction mapping)
     analyticsLimiter = new Ratelimit({
       redis: redis,
       limiter: Ratelimit.slidingWindow(20, "10 s"),
       analytics: false,
       prefix: "tzk_analytics_burst",
+    });
+
+    // Login Limit: 5 attempts per 15 minutes per IP + Hashed Identifier
+    loginLimiter = new Ratelimit({
+      redis: redis,
+      limiter: Ratelimit.slidingWindow(5, "15 m"),
+      analytics: true,
+      prefix: "tzk_login_burst",
     });
   }
 } catch (error) {
@@ -73,8 +86,6 @@ export async function getClientIp(): Promise<string> {
   if (!ip) {
     const forwardedFor = headersList.get('x-forwarded-for');
     if (forwardedFor) {
-      // In production, Vercel guarantees x-real-ip. If missing, fallback to left-most 
-      // assuming Vercel overwrites, but x-real-ip is the safest. No arbitrary client bypass allowed.
       ip = forwardedFor.split(',')[0].trim();
     }
   }
@@ -83,12 +94,10 @@ export async function getClientIp(): Promise<string> {
     return 'unknown_ip';
   }
 
-  // Basic normalization for IPv6 localhost
   if (ip === '::1') {
     return '127.0.0.1';
   }
 
-  // Remove port if present (IPv4)
   if (ip.includes(':') && ip.split(':').length === 2) {
     ip = ip.split(':')[0];
   }
@@ -116,13 +125,11 @@ export async function checkCreationRateLimit(): Promise<{ success: boolean; erro
     }
   }
 
-  // If we are in production and Redis is missing, FAIL CLOSED.
   if (process.env.NODE_ENV === 'production') {
     console.error("CRITICAL: Upstash Redis is missing in production environment. Failing closed for creation.");
     return { success: false, error: 'الخدمة غير متاحة حالياً. الرجاء المحاولة لاحقاً.' };
   }
 
-  // Fallback for development (in-memory) if Redis not configured
   const now = Date.now();
   const record = fallbackCreateMap.get(ip);
   if (record && record.resetAt > now) {
@@ -157,13 +164,11 @@ export async function checkRecoveryRateLimit(): Promise<{ success: boolean; erro
     }
   }
 
-  // If we are in production and Redis is missing, FAIL CLOSED.
   if (process.env.NODE_ENV === 'production') {
     console.error("CRITICAL: Upstash Redis is missing in production environment. Failing closed for recovery.");
     return { success: false, error: 'الخدمة غير متاحة حالياً. الرجاء المحاولة لاحقاً.' };
   }
 
-  // Fallback for development
   const now = Date.now();
   const record = fallbackRecoverMap.get(ip);
   if (record && record.resetAt > now) {
@@ -185,7 +190,7 @@ export async function checkRsvpRateLimit(invitationId: string): Promise<{ succes
     return { success: true };
   }
   const ip = await getClientIp();
-  const key = `${ip}:${invitationId}`; // specific to invitation
+  const key = `${ip}:${invitationId}`;
 
   if (rsvpLimiter) {
     try {
@@ -235,11 +240,54 @@ export async function checkAnalyticsRateLimit(invitationId: string): Promise<{ s
       return { success: true };
     } catch (error) {
       console.error("Upstash RateLimit Error (Analytics):", error);
-      // Fail-open for UX but drop event to prevent unbounded database ingestion
       return { success: false, drop: true, error: 'Rate limit infrastructure unavailable' };
     }
   }
 
-  // If Redis is missing, Fail-open for UX but drop event
   return { success: false, drop: true, error: 'Redis unconfigured' };
+}
+
+const fallbackLoginMap = new Map<string, { count: number, resetAt: number }>();
+
+function hashIdentifier(identifier: string): string {
+  return createHash('sha256').update(identifier).digest('hex').substring(0, 16);
+}
+
+export async function checkLoginRateLimit(normalizedName: string): Promise<{ success: boolean; error?: string }> {
+  if (isTestMode()) {
+    return { success: true };
+  }
+  const ip = await getClientIp();
+  const key = `${ip}:${hashIdentifier(normalizedName)}`;
+
+  if (loginLimiter) {
+    try {
+      const { success } = await loginLimiter.limit(key);
+      if (!success) {
+        return { success: false, error: 'تم إجراء عدة محاولات تسجيل دخول. حاول مرة أخرى بعد قليل.' };
+      }
+      return { success: true };
+    } catch (error) {
+      console.error("Upstash RateLimit Error (Login):", error);
+      return { success: false, error: 'الخدمة غير متاحة مؤقتاً. الرجاء المحاولة لاحقاً.' };
+    }
+  }
+
+  if (process.env.NODE_ENV === 'production') {
+    console.error("CRITICAL: Upstash Redis is missing in production environment. Failing closed for login.");
+    return { success: false, error: 'الخدمة غير متاحة حالياً. الرجاء المحاولة لاحقاً.' };
+  }
+
+  const now = Date.now();
+  const record = fallbackLoginMap.get(key);
+  if (record && record.resetAt > now) {
+    if (record.count >= 5) {
+      return { success: false, error: 'تم إجراء عدة محاولات تسجيل دخول. حاول مرة أخرى بعد قليل.' };
+    }
+    record.count++;
+  } else {
+    fallbackLoginMap.set(key, { count: 1, resetAt: now + 15 * 60 * 1000 });
+  }
+
+  return { success: true };
 }

@@ -77,7 +77,8 @@ test.describe.serial('Security & Access Control', () => {
     const adminRoutes = [
       '/admin',
       '/admin/orders',
-      '/admin/invitations'
+      '/admin/invitations',
+      '/admin/operations/support'
     ];
 
     for (const route of adminRoutes) {

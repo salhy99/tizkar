@@ -70,6 +70,16 @@ export default async function AdminPaymentConfirmPage({
             هذا الطلب مؤكد مسبقاً (PAID).
           </div>
         )}
+        
+        <div className="mt-8 pt-6 border-t flex justify-between items-center">
+          <span className="text-sm text-slate-500">هل هناك مشكلة في هذا الطلب؟</span>
+          <Link 
+            href={`/admin/operations/support/new?order_id=${order.id}&invitation_id=${order.invitation_id}`}
+            className="text-amber-600 hover:text-amber-700 text-sm font-semibold underline"
+          >
+            فتح تذكرة دعم (Support Case)
+          </Link>
+        </div>
       </div>
     </div>
   )
