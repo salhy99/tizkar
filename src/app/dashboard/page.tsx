@@ -27,7 +27,7 @@ export default async function DashboardPage() {
     .single();
 
   const profile = profileRaw as { display_name: string | null } | null;
-
+  
   // Fetch invitations
   const { data: invitations } = await supabase
     .from("invitations")
@@ -67,7 +67,7 @@ export default async function DashboardPage() {
 
   return (
     <main className="min-h-screen bg-[#FAF8F3]" dir="rtl">
-      <DashboardHeader userName={profile?.display_name || user.phone || ""} phone={user.phone!} userId={user.id} />
+      <DashboardHeader userName={profile?.display_name || "مستخدم تذكار"} userId={user.id} />
 
       <div className="container mx-auto px-4 py-12 max-w-6xl">
         <div className="flex flex-col md:flex-row justify-between items-center mb-8">

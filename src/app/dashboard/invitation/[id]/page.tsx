@@ -85,7 +85,7 @@ export default async function InvitationDashboardPage({ params }: { params: Prom
 
   return (
     <main className="min-h-screen bg-[#FAF8F3]" dir="rtl">
-      <DashboardHeader userName={profile?.display_name || user.phone || ""} phone={user.phone!} userId={user.id} />
+      <DashboardHeader userName={profile?.display_name || "مستخدم تذكار"} userId={user.id} />
 
       <div className="container mx-auto px-4 py-8 max-w-6xl">
         <div className="mb-8">

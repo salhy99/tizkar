@@ -15,7 +15,7 @@ export interface Notification {
   is_read: boolean
 }
 
-export function DashboardHeader({ userName, phone, userId }: { userName: string, phone: string, userId: string }) {
+export function DashboardHeader({ userName, userId }: { userName: string, userId: string }) {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [showDropdown, setShowDropdown] = useState(false)
   
@@ -94,7 +94,6 @@ export function DashboardHeader({ userName, phone, userId }: { userName: string,
 
           <div className="hidden md:flex flex-col items-end mr-4">
             <span className="text-sm font-bold">{userName}</span>
-            <span className="text-xs text-muted-foreground" dir="ltr">{phone}</span>
           </div>
 
           <form action="/auth/signout" method="POST">

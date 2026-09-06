@@ -1,0 +1,113 @@
+
+> tidkar@0.1.0 dev
+> next dev
+
+▲ Next.js 16.3.2 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.0.111:3000
+- Environments: .env.local
+✓ Ready in 1157ms
+✓ Running next.config.ts took 36ms
+
+ GET / 200 in 1489ms (next.js: 236ms, application-code: 1253ms)
+ GET / 200 in 650ms (next.js: 2ms, application-code: 648ms)
+ GET / 200 in 561ms (next.js: 1.9ms, application-code: 559ms)
+ GET /register 200 in 948ms (next.js: 800ms, application-code: 148ms)
+ GET /login 200 in 67ms (next.js: 28ms, application-code: 39ms)
+ POST /login 200 in 667ms (next.js: 5ms, application-code: 662ms)
+  └─ ƒ loginWithUsername("test_user", "wrongpass") in 650ms src/actions/auth.ts
+ GET /login 200 in 24ms (next.js: 2ms, application-code: 22ms)
+ POST /login 200 in 502ms (next.js: 5ms, application-code: 497ms)
+  └─ ƒ loginWithUsername("unknown_user999", "anypass123") in 488ms src/actions/auth.ts
+ GET /login 200 in 31ms (next.js: 6ms, application-code: 25ms)
+ GET /dashboard 307 in 121ms (next.js: 61ms, application-code: 60ms)
+ GET /login 200 in 28ms (next.js: 3ms, application-code: 24ms)
+ GET /register 200 in 33ms (next.js: 8ms, application-code: 25ms)
+ GET /login 200 in 43ms (next.js: 10ms, application-code: 33ms)
+ POST /login 200 in 401ms (next.js: 2ms, application-code: 399ms)
+  └─ ƒ loginWithUsername("test_user", "wrongpass") in 393ms src/actions/auth.ts
+ GET /login 200 in 47ms (next.js: 5ms, application-code: 42ms)
+ POST /login 200 in 397ms (next.js: 3ms, application-code: 393ms)
+  └─ ƒ loginWithUsername("unknown_user999", "anypass123") in 386ms src/actions/auth.ts
+ GET /login 200 in 34ms (next.js: 5ms, application-code: 29ms)
+ GET /dashboard 307 in 68ms (next.js: 11ms, application-code: 57ms)
+ GET /login 200 in 46ms (next.js: 4ms, application-code: 41ms)
+ GET /register 200 in 24ms (next.js: 2ms, application-code: 22ms)
+ GET /login 200 in 24ms (next.js: 2ms, application-code: 22ms)
+ GET /login 200 in 26ms (next.js: 2ms, application-code: 24ms)
+ GET / 200 in 425ms (next.js: 15ms, application-code: 410ms)
+ GET / 200 in 285ms (next.js: 1.9ms, application-code: 283ms)
+ GET /register 200 in 26ms (next.js: 3ms, application-code: 23ms)
+ GET /login 200 in 23ms (next.js: 2.0ms, application-code: 21ms)
+ POST /login 200 in 495ms (next.js: 3ms, application-code: 492ms)
+  └─ ƒ loginWithUsername("test_user", "wrongpass") in 484ms src/actions/auth.ts
+ GET /login 200 in 24ms (next.js: 1.8ms, application-code: 22ms)
+ POST /login 200 in 765ms (next.js: 4ms, application-code: 761ms)
+  └─ ƒ loginWithUsername("unknown_user999", "anypass123") in 755ms src/actions/auth.ts
+ GET /login 200 in 23ms (next.js: 1.9ms, application-code: 22ms)
+ GET /dashboard 307 in 38ms (next.js: 2.0ms, application-code: 36ms)
+ GET /login 200 in 23ms (next.js: 2ms, application-code: 21ms)
+ GET /register 200 in 31ms (next.js: 4ms, application-code: 27ms)
+ GET /login 200 in 43ms (next.js: 3ms, application-code: 41ms)
+ POST /login 200 in 364ms (next.js: 3ms, application-code: 361ms)
+  └─ ƒ loginWithUsername("test_user", "wrongpass") in 355ms src/actions/auth.ts
+ GET /login 200 in 26ms (next.js: 2.0ms, application-code: 24ms)
+ POST /login 200 in 243ms (next.js: 4ms, application-code: 239ms)
+  └─ ƒ loginWithUsername("unknown_user999", "anypass123") in 229ms src/actions/auth.ts
+ GET /login 200 in 97ms (next.js: 15ms, application-code: 82ms)
+ GET /dashboard 307 in 81ms (next.js: 8ms, application-code: 72ms)
+ GET /login 200 in 45ms (next.js: 3ms, application-code: 42ms)
+ GET /register 200 in 22ms (next.js: 1.8ms, application-code: 20ms)
+ GET /login 200 in 26ms (next.js: 1.9ms, application-code: 24ms)
+ GET /login 200 in 27ms (next.js: 3ms, application-code: 24ms)
+ GET /login 200 in 32ms (next.js: 2ms, application-code: 30ms)
+ GET /dashboard 307 in 45ms (next.js: 1.9ms, application-code: 43ms)
+ GET /login 200 in 24ms (next.js: 1.9ms, application-code: 22ms)
+ GET /register 200 in 37ms (next.js: 2ms, application-code: 35ms)
+ GET /login 200 in 24ms (next.js: 1.9ms, application-code: 22ms)
+ POST /login 200 in 709ms (next.js: 4ms, application-code: 705ms)
+  └─ ƒ loginWithUsername("test_user", "wrongpass") in 696ms src/actions/auth.ts
+ GET /login 200 in 22ms (next.js: 1.9ms, application-code: 20ms)
+ POST /login 200 in 872ms (next.js: 4ms, application-code: 868ms)
+  └─ ƒ loginWithUsername("unknown_user999", "anypass123") in 859ms src/actions/auth.ts
+ GET /login 200 in 25ms (next.js: 1.9ms, application-code: 23ms)
+ GET /dashboard 307 in 38ms (next.js: 1.9ms, application-code: 36ms)
+ GET /login 200 in 24ms (next.js: 2ms, application-code: 22ms)
+ GET / 200 in 480ms (next.js: 64ms, application-code: 417ms)
+ GET / 200 in 285ms (next.js: 1.8ms, application-code: 284ms)
+ GET /register 200 in 24ms (next.js: 2ms, application-code: 22ms)
+ GET /login 200 in 24ms (next.js: 2ms, application-code: 22ms)
+ POST /login 200 in 321ms (next.js: 4ms, application-code: 317ms)
+  └─ ƒ loginWithUsername("test_user", "wrongpass") in 311ms src/actions/auth.ts
+ GET /login 200 in 23ms (next.js: 2ms, application-code: 21ms)
+ POST /login 200 in 326ms (next.js: 4ms, application-code: 322ms)
+  └─ ƒ loginWithUsername("unknown_user999", "anypass123") in 315ms src/actions/auth.ts
+ GET /login 200 in 29ms (next.js: 3ms, application-code: 25ms)
+ GET /dashboard 307 in 35ms (next.js: 2.0ms, application-code: 33ms)
+ GET /login 200 in 24ms (next.js: 1.9ms, application-code: 23ms)
+ GET /register 200 in 36ms (next.js: 3ms, application-code: 33ms)
+ GET /login 200 in 32ms (next.js: 4ms, application-code: 29ms)
+ POST /login 200 in 458ms (next.js: 3ms, application-code: 456ms)
+  └─ ƒ loginWithUsername("test_user", "wrongpass") in 449ms src/actions/auth.ts
+ GET /login 200 in 66ms (next.js: 3ms, application-code: 63ms)
+ POST /login 200 in 252ms (next.js: 3ms, application-code: 248ms)
+  └─ ƒ loginWithUsername("unknown_user999", "anypass123") in 242ms src/actions/auth.ts
+ GET /login 200 in 55ms (next.js: 18ms, application-code: 37ms)
+ GET /dashboard 307 in 46ms (next.js: 4ms, application-code: 42ms)
+ GET /login 200 in 37ms (next.js: 3ms, application-code: 34ms)
+ GET /register 200 in 25ms (next.js: 2.0ms, application-code: 23ms)
+ GET /login 200 in 21ms (next.js: 1.8ms, application-code: 19ms)
+ GET /login 200 in 53ms (next.js: 2ms, application-code: 51ms)
+ GET /login 200 in 29ms (next.js: 3ms, application-code: 26ms)
+ GET /dashboard 307 in 36ms (next.js: 2.0ms, application-code: 34ms)
+ GET /login 200 in 31ms (next.js: 2.0ms, application-code: 29ms)
+ GET /register 200 in 30ms (next.js: 3ms, application-code: 27ms)
+ GET /login 200 in 23ms (next.js: 2ms, application-code: 21ms)
+ POST /login 200 in 650ms (next.js: 5ms, application-code: 645ms)
+  └─ ƒ loginWithUsername("test_user", "wrongpass") in 632ms src/actions/auth.ts
+ GET /login 200 in 25ms (next.js: 2ms, application-code: 23ms)
+ POST /login 200 in 491ms (next.js: 3ms, application-code: 488ms)
+  └─ ƒ loginWithUsername("unknown_user999", "anypass123") in 479ms src/actions/auth.ts
+ GET /login 200 in 26ms (next.js: 2ms, application-code: 24ms)
+ GET /dashboard 307 in 36ms (next.js: 2ms, application-code: 34ms)
+ GET /login 200 in 26ms (next.js: 1.9ms, application-code: 24ms)

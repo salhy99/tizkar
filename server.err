@@ -1,0 +1,30 @@
+⨯ Error: Invalid supabaseUrl: Must be a valid HTTP or HTTPS URL.
+    at <unknown> (E:\Users\lenovo\Desktop\تذكار\.next\server\chunks\ssr\_2118v2r._.js:23:4692)
+    at t (E:\Users\lenovo\Desktop\تذكار\.next\server\chunks\ssr\_2118v2r._.js:23:5591)
+    at async j (E:\Users\lenovo\Desktop\تذكار\.next\server\chunks\ssr\_1264_j7._.js:1:7312) {
+  digest: '1831012805'
+}
+⨯ Error: Invalid supabaseUrl: Must be a valid HTTP or HTTPS URL.
+    at <unknown> (E:\Users\lenovo\Desktop\تذكار\.next\server\chunks\ssr\_2118v2r._.js:23:4692)
+    at t (E:\Users\lenovo\Desktop\تذكار\.next\server\chunks\ssr\_2118v2r._.js:23:5591)
+    at async j (E:\Users\lenovo\Desktop\تذكار\.next\server\chunks\ssr\_1264_j7._.js:1:7312) {
+  digest: '1831012805'
+}
+⨯ Error: Invalid supabaseUrl: Must be a valid HTTP or HTTPS URL.
+    at <unknown> (E:\Users\lenovo\Desktop\تذكار\.next\server\chunks\ssr\_2118v2r._.js:23:4692)
+    at t (E:\Users\lenovo\Desktop\تذكار\.next\server\chunks\ssr\_2118v2r._.js:23:5591)
+    at async j (E:\Users\lenovo\Desktop\تذكار\.next\server\chunks\ssr\_1264_j7._.js:1:7312) {
+  digest: '1831012805'
+}
+⨯ Error: Invalid supabaseUrl: Must be a valid HTTP or HTTPS URL.
+    at <unknown> (E:\Users\lenovo\Desktop\تذكار\.next\server\chunks\ssr\_2118v2r._.js:23:4692)
+    at t (E:\Users\lenovo\Desktop\تذكار\.next\server\chunks\ssr\_2118v2r._.js:23:5591)
+    at async j (E:\Users\lenovo\Desktop\تذكار\.next\server\chunks\ssr\_1264_j7._.js:1:7312) {
+  digest: '1831012805'
+}
+⨯ Error: Invalid supabaseUrl: Must be a valid HTTP or HTTPS URL.
+    at <unknown> (E:\Users\lenovo\Desktop\تذكار\.next\server\chunks\ssr\_2118v2r._.js:23:4692)
+    at t (E:\Users\lenovo\Desktop\تذكار\.next\server\chunks\ssr\_2118v2r._.js:23:5591)
+    at async j (E:\Users\lenovo\Desktop\تذكار\.next\server\chunks\ssr\_1264_j7._.js:1:7312) {
+  digest: '1831012805'
+}

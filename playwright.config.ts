@@ -64,10 +64,5 @@ export default defineConfig({
       use: { ...devices['Pixel 5'] }, // Approximately 390x844
     },
   ],
-  webServer: {
-    command: 'npm run dev',
-    url: 'http://localhost:3000',
-    reuseExistingServer: !process.env.CI,
-    timeout: 120 * 1000,
-  },
+  // webServer disabled as server is already running on port 3000
 });
