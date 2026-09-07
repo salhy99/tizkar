@@ -7,7 +7,24 @@ permissions:
   contents: read
 
 jobs:
+  fetch-prod-identity:
+    runs-on: ubuntu-latest
+    environment: production
+    outputs:
+      prod_endpoint_hash: ${{ steps.hash.outputs.endpoint_hash }}
+      prod_ak_hash: ${{ steps.hash.outputs.ak_hash }}
+    steps:
+      - name: Hash Production Account Identifier
+        id: hash
+        run: |
+          # Hash the endpoint and access key to compare them without exposing credentials
+          ENDPOINT="${{ secrets.BACKUP_S3_ENDPOINT }}"
+          AK="${{ secrets.BACKUP_S3_ACCESS_KEY_ID }}"
+          echo "endpoint_hash=$(echo -n "$ENDPOINT" | sha256sum | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+          echo "ak_hash=$(echo -n "$AK" | sha256sum | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+
   diagnostic:
+    needs: fetch-prod-identity
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: restore-drill # Strict read-only R2 access
@@ -32,3 +49,5 @@ jobs:
           BACKUP_S3_ACCESS_KEY_ID: ${{ secrets.BACKUP_S3_ACCESS_KEY_ID }}
           BACKUP_S3_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_S3_SECRET_ACCESS_KEY }}
           BACKUP_S3_BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}
+          PROD_ENDPOINT_HASH: ${{ needs.fetch-prod-identity.outputs.prod_endpoint_hash }}
+          PROD_AK_HASH: ${{ needs.fetch-prod-identity.outputs.prod_ak_hash }}

@@ -8,8 +8,11 @@ const EXPECTED_BUCKET = 'tizkar-storage-backup';
 const DUMP_KEY = `tizkar-production/database/${PINNED_BACKUP_ID}.dump`;
 const MANIFEST_KEY = `tizkar-production/database/${PINNED_BACKUP_ID}.manifest.json`;
 
+import * as crypto from 'crypto';
+
 const endpoint = process.env.BACKUP_S3_ENDPOINT || '';
 const bucket = process.env.BACKUP_S3_BUCKET || '';
+const accessKey = process.env.BACKUP_S3_ACCESS_KEY_ID || '';
 
 console.log('=== R2 DIAGNOSTIC MODE ===');
 
@@ -17,11 +20,25 @@ console.log('=== R2 DIAGNOSTIC MODE ===');
 const endpointFingerprint = endpoint.replace(/https:\/\/[^\.]+\./, 'https://***.');
 console.log(`ENDPOINT_FINGERPRINT: ${endpointFingerprint}`);
 
-const endpointMatch = endpointFingerprint.includes('.r2.cloudflarestorage.com') ? 'YES (R2 format)' : 'UNKNOWN';
-console.log(`ENDPOINT_ACCOUNT_MATCH: ${endpointMatch}`);
+const endpointFormat = endpointFingerprint.includes('.r2.cloudflarestorage.com') ? 'YES (R2 format)' : 'UNKNOWN';
+const hasPathStyle = (new URL(endpoint).pathname !== '/') ? 'NO (Contains path, likely bucket)' : 'YES';
+console.log(`ENDPOINT_MATCH: ${endpointFormat}`);
+console.log(`ADDRESSING_STYLE: ${hasPathStyle}`);
 
 const bucketMatch = bucket === EXPECTED_BUCKET;
-console.log(`BUCKET_NAME_MATCH: ${bucketMatch ? 'YES' : 'NO (Got: ' + bucket + ')'}`);
+console.log(`BUCKET_MATCH: ${bucketMatch ? 'YES' : 'NO (Got: ' + bucket + ')'}`);
+
+// Hash comparison for Account Identifier / Endpoint
+const prodEndpointHash = process.env.PROD_ENDPOINT_HASH;
+const prodAkHash = process.env.PROD_AK_HASH;
+const localEndpointHash = crypto.createHash('sha256').update(endpoint).digest('hex');
+const localAkHash = crypto.createHash('sha256').update(accessKey).digest('hex');
+
+if (prodEndpointHash === localEndpointHash && prodAkHash === localAkHash) {
+  console.log(`ACCOUNT_ID_MATCH: YES`);
+} else {
+  console.log(`ACCOUNT_ID_MATCH: NO (Restore-drill identity does NOT match Production)`);
+}
 
 if (!bucket) {
   console.error('FATAL: BACKUP_S3_BUCKET is not set.');
