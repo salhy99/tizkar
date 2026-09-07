@@ -1,4 +1,4 @@
-name: R2 Object Existence Diagnostic
+name: R2 Diagnostic Mode
 
 on:
   workflow_dispatch:
