@@ -10,87 +10,120 @@ const MANIFEST_KEY = `tizkar-production/database/${PINNED_BACKUP_ID}.manifest.js
 
 const endpoint = process.env.BACKUP_S3_ENDPOINT || '';
 const bucket = process.env.BACKUP_S3_BUCKET || '';
+const accessKey = process.env.BACKUP_S3_ACCESS_KEY_ID || '';
+const secretKey = process.env.BACKUP_S3_SECRET_ACCESS_KEY || '';
 
 console.log('=== R2 DIAGNOSTIC MODE ===');
 
-// Safely fingerprint endpoint (e.g., https://12345.r2.cloudflarestorage.com -> https://***.r2.cloudflarestorage.com)
-const endpointFingerprint = endpoint.replace(/https:\/\/[^\.]+\./, 'https://***.');
-console.log(`ENDPOINT_FINGERPRINT: ${endpointFingerprint}`);
-
-const endpointMatch = endpointFingerprint.includes('.r2.cloudflarestorage.com') ? 'YES (R2 format)' : 'UNKNOWN';
-console.log(`ENDPOINT_ACCOUNT_MATCH: ${endpointMatch}`);
-
-const bucketMatch = bucket === EXPECTED_BUCKET;
-console.log(`BUCKET_NAME_MATCH: ${bucketMatch ? 'YES' : 'NO (Got: ' + bucket + ')'}`);
-
-if (!bucket) {
-  console.error('FATAL: BACKUP_S3_BUCKET is not set.');
+if (!endpoint || !bucket || !accessKey || !secretKey) {
+  console.error('FATAL: Missing one or more BACKUP_S3_* environment variables.');
   process.exit(1);
 }
 
+// 1. Endpoint Normalization Check
+const parsedEndpoint = new URL(endpoint);
+const isR2 = parsedEndpoint.hostname.endsWith('.r2.cloudflarestorage.com');
+const isAccountLevel = parsedEndpoint.pathname === '/';
+const hasTrailingSlash = endpoint.endsWith('/');
+
+console.log(`\n[Configuration Analysis]`);
+console.log(`Endpoint R2 Format: ${isR2 ? 'YES' : 'NO'}`);
+console.log(`Endpoint is Account-Level (No Path): ${isAccountLevel ? 'YES' : 'NO'}`);
+console.log(`Endpoint has Trailing Slash: ${hasTrailingSlash ? 'YES' : 'NO'}`);
+console.log(`Configured Region: auto (Required for R2)`);
+console.log(`Configured Bucket matches expected: ${bucket === EXPECTED_BUCKET ? 'YES' : 'NO (Got ' + bucket + ')'}`);
+
+// In AWS SDK v3, forcePathStyle: false (default) uses virtual-hosted style (bucket.endpoint.com).
+// Cloudflare R2 supports virtual-hosted style now, but we'll test with standard config matching backup script.
 const s3Client = new S3Client({
   endpoint: endpoint,
-  region: 'auto', // R2 requires 'auto' if region is unset
+  region: 'auto',
+  // forcePathStyle is NOT set here because database-backup.ts did not set it.
   credentials: {
-    accessKeyId: process.env.BACKUP_S3_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.BACKUP_S3_SECRET_ACCESS_KEY!
+    accessKeyId: accessKey,
+    secretAccessKey: secretKey
   }
 });
 
-async function checkObject(key: string, label: string) {
-  try {
-    const head = await s3Client.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
-    console.log(`${label}_HEAD_STATUS: 200 OK`);
-    console.log(`${label}_EXISTS: YES`);
-    console.log(`${label}_SIZE: ${head.ContentLength} bytes`);
-    if (head.ETag) console.log(`${label}_ETAG: ${head.ETag}`);
-    return true;
-  } catch (error: any) {
-    console.log(`${label}_HEAD_STATUS: ${error.$metadata?.httpStatusCode || error.name}`);
-    console.log(`${label}_EXISTS: NO`);
-    console.log(`${label}_SIZE: N/A`);
-    return false;
+async function describeError(error: any): Promise<string> {
+  const code = error.name || error.Code || 'UnknownError';
+  const status = error.$metadata?.httpStatusCode || 'N/A';
+  
+  if (status === 403 || code === 'AccessDenied') {
+    return `AccessDenied (${status}): Credentials lack permission for this operation on the target bucket. Check if the token has read access to '${bucket}' in the correct Cloudflare account.`;
   }
+  if (status === 404 || code === 'NoSuchBucket' || code === 'NotFound') {
+    // A 404 on HeadObject is often just 'NotFound', whereas on ListObjects it might be NoSuchBucket.
+    return `${code} (${status}): Object or bucket not found.`;
+  }
+  if (status === 400) {
+    return `BadRequest (${status}): Often implies region mismatch or malformed endpoint addressing (e.g., virtual-host vs path-style bug).`;
+  }
+  return `${code} (${status})`;
 }
 
 async function runDiagnostic() {
   console.log(`\n[Checking Dump] ${DUMP_KEY}`);
-  const dumpExists = await checkObject(DUMP_KEY, 'DUMP');
+  let dumpFound = false;
+  try {
+    const head = await s3Client.send(new HeadObjectCommand({ Bucket: bucket, Key: DUMP_KEY }));
+    console.log(`DUMP_HEAD_STATUS: 200 OK`);
+    console.log(`DUMP_EXISTS: YES`);
+    console.log(`DUMP_SIZE: ${head.ContentLength} bytes`);
+    dumpFound = true;
+  } catch (error: any) {
+    const desc = await describeError(error);
+    console.log(`DUMP_HEAD_STATUS: ${desc}`);
+    console.log(`DUMP_EXISTS: NO`);
+  }
 
   console.log(`\n[Checking Manifest] ${MANIFEST_KEY}`);
-  const manifestExists = await checkObject(MANIFEST_KEY, 'MANIFEST');
+  let manifestFound = false;
+  try {
+    const head = await s3Client.send(new HeadObjectCommand({ Bucket: bucket, Key: MANIFEST_KEY }));
+    console.log(`MANIFEST_HEAD_STATUS: 200 OK`);
+    console.log(`MANIFEST_EXISTS: YES`);
+    console.log(`MANIFEST_SIZE: ${head.ContentLength} bytes`);
+    manifestFound = true;
+  } catch (error: any) {
+    const desc = await describeError(error);
+    console.log(`MANIFEST_HEAD_STATUS: ${desc}`);
+    console.log(`MANIFEST_EXISTS: NO`);
+  }
 
-  if (!dumpExists || !manifestExists) {
-    console.log(`\n[Listing Objects] Object(s) not found. Attempting a bounded prefix list...`);
-    const prefix = `tizkar-production/database/`;
+  if (!dumpFound || !manifestFound) {
+    console.log(`\n[Diagnostics] Attempting bounded ListObjectsV2 on bucket root to distinguish NoSuchBucket from NoSuchKey...`);
     try {
       const listData = await s3Client.send(new ListObjectsV2Command({
         Bucket: bucket,
-        Prefix: prefix,
-        MaxKeys: 10
+        Prefix: 'tizkar-production/database/',
+        MaxKeys: 5
       }));
-      console.log(`List Status: 200 OK`);
+      
+      console.log(`LIST_STATUS: 200 OK`);
+      console.log(`LIST_EXISTS: Bucket exists and allows listing.`);
       if (listData.Contents && listData.Contents.length > 0) {
-        console.log(`Found ${listData.Contents.length} objects under prefix '${prefix}':`);
+        console.log(`Found ${listData.Contents.length} objects under backup prefix. First few:`);
         listData.Contents.forEach(obj => {
-          // Log only safe info to prove presence
           console.log(` - Key: ${obj.Key} (Size: ${obj.Size})`);
         });
       } else {
-        console.log(`No objects found under prefix '${prefix}'.`);
+        console.log(`No objects found under prefix. The bucket exists in the authenticated account, but it is empty or missing these specific backups.`);
+        console.log(`-> POSSIBLE MISMATCH: The Access Key used here might point to a DIFFERENT Cloudflare account that happens to have an empty '${bucket}' bucket.`);
       }
     } catch (listErr: any) {
-      console.log(`List Error: Could not list objects (${listErr.name}). Note: Credentials may lack list permissions.`);
+      const desc = await describeError(listErr);
+      console.log(`LIST_STATUS: ${desc}`);
+      if (desc.includes('NoSuchBucket')) {
+        console.log(`-> MISMATCH CONFIRMED: The bucket '${bucket}' does not exist in the Cloudflare account associated with this Access Key.`);
+      } else if (desc.includes('AccessDenied')) {
+        console.log(`-> MISMATCH POSSIBLE: The token does not have List permissions, or is restricted to a specific path/IP.`);
+      }
     }
-    console.log('\nACTUAL_KEY_MISMATCH: PENDING REVIEW (Review list output)');
-  } else {
-    console.log('\nACTUAL_KEY_MISMATCH: NO (Keys perfectly matched)');
   }
-
-  console.log('\nROOT_CAUSE: PENDING GITHUB EXECUTION (Review workflow logs)');
 }
 
 runDiagnostic().catch(err => {
-  console.error('Diagnostic crashed:', err.name);
+  console.error('Diagnostic crashed:', err.name || err.message);
   process.exit(1);
 });
