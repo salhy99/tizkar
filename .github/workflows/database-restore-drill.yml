@@ -39,8 +39,12 @@ jobs:
           sudo apt-get install -y postgresql-client-17
           /usr/lib/postgresql/17/bin/pg_dump --version
 
-      - name: Start Disposable Local Supabase Stack
-        run: npx supabase start
+      - name: Start Disposable Local Supabase Stack (Empty)
+        run: |
+          mkdir -p supabase_empty/supabase
+          cp supabase/config.toml supabase_empty/supabase/
+          cd supabase_empty
+          npx supabase start
 
       - name: Create Disposable Restore Database
         run: PGPASSWORD=postgres psql -h 127.0.0.1 -p 54322 -U postgres -d postgres -c "CREATE DATABASE tizkar_restore_drill;"
