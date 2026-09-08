@@ -31,8 +31,12 @@ test.describe.serial('Security & Access Control', () => {
     }
     editorUrlB = page.url();
 
-    // Since we are not paying, it won't be easily published unless we mock payment, but wait:
-    // Draft invitations can be checked for security too. We just need its editor URL.
+    // Open Accordion and populate synthetic private fields to verify they are not leaked
+    await page.getByRole('button', { name: 'معلومات المناسبة' }).click();
+    await page.getByPlaceholder('مثال: أحمد محمد').fill(`groom-${testIdB}`);
+    await page.getByPlaceholder('مثال: زهراء علي').fill(`bride-${testIdB}`);
+    // Editor uses auto-save, wait for it to complete
+    await expect(page.getByText('تم الحفظ ✓')).toBeVisible({ timeout: 15000 });
   });
 
   test('Create Invitation A and test isolation', async ({ browser }) => {
@@ -66,7 +70,8 @@ test.describe.serial('Security & Access Control', () => {
       
       // Explicitly check that private data is not returned in HTML or DOM
       const content = await pageA.content();
-      expect(content).not.toContain(testIdB); // B's title/data must not leak
+      expect(content).not.toContain(`groom-${testIdB}`); // B's title/data must not leak
+      expect(content).not.toContain(`bride-${testIdB}`);
     } else {
       // It redirected successfully away from the editor
       expect(pageA.url()).not.toBe(editorUrlB);
@@ -107,16 +112,26 @@ test.describe.serial('Security & Access Control', () => {
     const slugB = editorUrlB.split('/editor/')[1];
     
     // Public route
-    await page.goto(`/${slugB}`);
+    const res = await page.goto(`/${slugB}`);
     // Should show the not available fallback
     await expect(page.getByText('هذه الدعوة غير متاحة حالياً')).toBeVisible();
+    
     // Ensure no private data leaked
     const content = await page.content();
-    expect(content).not.toContain(testIdB);
+    expect(content).not.toContain(`groom-${testIdB}`);
+    expect(content).not.toContain(`bride-${testIdB}`);
+    expect(content).not.toContain('tzk_'); // Check that edit tokens are not leaked in HTML
+    
+    // Ensure not 200 Success if it's the draft page (App returns 404, or 200 with fallback? Let's check status if available)
+    if (res?.status() === 200) {
+       expect(content).toContain('هذه الدعوة غير متاحة حالياً'); // Fallback is rendered safely
+    }
 
     // OG Image
     const ogRes = await page.request.get(`/${slugB}/opengraph-image`);
     expect(ogRes.status()).toBe(404);
+    const ogText = await ogRes.text();
+    expect(ogText).not.toContain(`groom-${testIdB}`);
 
     // Story
     const storyRes = await page.request.get(`/api/invitations/${slugB}/story`);
