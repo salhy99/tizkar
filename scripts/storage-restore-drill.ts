@@ -13,6 +13,12 @@ const accessKeyId = process.env.RESTORE_S3_ACCESS_KEY_ID;
 const secretAccessKey = process.env.RESTORE_S3_SECRET_ACCESS_KEY;
 const bucketName = process.env.RESTORE_S3_BUCKET;
 
+// Hard-crash if any Production credentials are leaked into the restore environment
+if (process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VERCEL_TOKEN) {
+  console.error('[RestoreDrill] FATAL: Forbidden production credentials detected in restore environment.');
+  process.exit(1);
+}
+
 if (!endpoint || !accessKeyId || !secretAccessKey || !bucketName) {
   console.error('[RestoreDrill] FATAL: Missing R2 read-only credentials in environment.');
   process.exit(1);
@@ -59,12 +65,23 @@ async function runDrill() {
     const selectedKeys: { key: string, size: number }[] = [];
     let selectedBytes = 0;
 
+    const allowRealMedia = process.env.ALLOW_REAL_CUSTOMER_MEDIA === 'true';
+
     for (const obj of objects) {
       if (!obj.Key || typeof obj.Size !== 'number') continue;
       
       if (obj.Size > MAX_OBJECT_SIZE) {
         console.log(`[RestoreDrill] Skipping ${obj.Key} (Exceeds max object size: ${obj.Size} bytes)`);
         continue;
+      }
+
+      // Safe sample selection constraint
+      if (!allowRealMedia) {
+        const isSynthetic = obj.Key.startsWith('synthetic/') || obj.Key.startsWith('test/') || obj.Key.includes('test-fixture');
+        if (!isSynthetic) {
+          console.log(`[RestoreDrill] Skipping ${obj.Key} (Real customer media requires ALLOW_REAL_CUSTOMER_MEDIA=true)`);
+          continue;
+        }
       }
       
       if (selectedKeys.length >= MAX_OBJECTS) break;
@@ -75,7 +92,7 @@ async function runDrill() {
     }
 
     if (selectedKeys.length === 0) {
-      console.log(`[RestoreDrill] No objects matched selection criteria.`);
+      console.log(`[RestoreDrill] No objects matched selection criteria. (If you meant to test real media, operator approval is required via ALLOW_REAL_CUSTOMER_MEDIA=true)`);
       return;
     }
 
@@ -107,9 +124,18 @@ async function runDrill() {
 
   } catch (err: any) {
     console.error(`[RestoreDrill] FATAL Error:`, err);
+    try {
+      await cleanup();
+    } catch (cleanupErr) {
+      console.error(`[RestoreDrill] CLEANUP_FAILED:`, cleanupErr);
+    }
     process.exit(1);
   } finally {
-    await cleanup();
+    try {
+      await cleanup();
+    } catch (cleanupErr) {
+      console.error(`[RestoreDrill] CLEANUP_FAILED:`, cleanupErr);
+    }
   }
 }
 

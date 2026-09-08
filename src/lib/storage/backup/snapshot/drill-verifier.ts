@@ -32,7 +32,7 @@ export async function verifyLegacyObject(
   try {
     const head = await s3.send(new HeadObjectCommand({ Bucket: bucketName, Key: key }));
     const expectedSize = head.ContentLength || 0;
-    const expectedHash = head.Metadata?.['x-tizkar-sha256'];
+    const expectedHash = head.Metadata?.['x-tizkar-sha256'] || head.Metadata?.['X-Tizkar-Sha256'] || head.Metadata?.['X-TIZKAR-SHA256'];
 
     if (!expectedHash) {
       return { key, status: 'NOT_VERIFIED', reason: 'Missing x-tizkar-sha256 metadata' };
@@ -49,7 +49,7 @@ export async function verifyLegacyObject(
 
     const opaqueFilename = `object_${Buffer.from(key).toString('base64url').substring(0, 16)}_${Date.now()}.bin`;
     const destPath = path.join(restoreDir, opaqueFilename);
-    const fileStream = createWriteStream(destPath);
+    const fileStream = createWriteStream(destPath, { mode: 0o600 });
     
     await pipeline(get.Body as NodeJS.ReadableStream, fileStream);
 
