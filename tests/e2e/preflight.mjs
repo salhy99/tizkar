@@ -57,6 +57,22 @@ if (!hostname.includes(DEVELOPMENT_PROJECT_ID) && hostname !== 'localhost' && ho
   console.warn('WARNING: Supabase URL does not match known Development Project ID or local network. Assuming staging environment.');
 }
 
+const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+let parsedAppUrl;
+try {
+  parsedAppUrl = new URL(appUrl);
+} catch {
+  console.error('FATAL ERROR: NEXT_PUBLIC_APP_URL is malformed.');
+  process.exit(1);
+}
+
+const appHostname = parsedAppUrl.hostname.toLowerCase();
+if (appHostname.includes('tizkar.vercel.app') || appHostname === 'tizkar.com' || appHostname.endsWith('.tizkar.com')) {
+  console.error('FATAL ERROR: NEXT_PUBLIC_APP_URL points to PRODUCTION application domain.');
+  console.error('Aborting preflight to prevent production data corruption.');
+  process.exit(1);
+}
+
 // Check Connectivity
 async function checkConnectivity() {
   const healthUrl = new URL('/rest/v1/', parsedUrl).toString();

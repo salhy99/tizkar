@@ -41,10 +41,34 @@ jobs:
 
       - name: Check Production Guard
         run: |
-          if [[ "${NEXT_PUBLIC_SUPABASE_URL}" == *"hnjfxdyterpbmkisaiiw"* ]]; then
+          if [[ "${NEXT_PUBLIC_SUPABASE_URL}" == *"hnjfxdyterpbmkisaiiw"* ]] || [[ "${NEXT_PUBLIC_APP_URL}" == *"tizkar.vercel.app"* ]]; then
             echo "ERROR: PRODUCTION TARGET DETECTED. ABORTING."
             exit 1
           fi
+
+      - name: Setup Ephemeral Local Supabase (if secrets not provided)
+        run: |
+          if [ -z "${NEXT_PUBLIC_SUPABASE_URL}" ]; then
+            echo "No external Supabase secrets configured. Starting ephemeral local Supabase stack..."
+            npx supabase start
+            STATUS_JSON=$(npx supabase status -o json)
+            
+            API_URL=$(echo "$STATUS_JSON" | jq -r '.API_URL')
+            ANON_KEY=$(echo "$STATUS_JSON" | jq -r '.ANON_KEY')
+            SERVICE_ROLE_KEY=$(echo "$STATUS_JSON" | jq -r '.SERVICE_ROLE_KEY')
+            
+            echo "NEXT_PUBLIC_SUPABASE_URL=${API_URL}" >> $GITHUB_ENV
+            echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=${ANON_KEY}" >> $GITHUB_ENV
+            echo "SUPABASE_SERVICE_ROLE_KEY=${SERVICE_ROLE_KEY}" >> $GITHUB_ENV
+            echo "E2E_ADMIN_EMAIL=admin@e2e.test" >> $GITHUB_ENV
+            echo "E2E_ADMIN_PASSWORD=e2e-password-123456" >> $GITHUB_ENV
+            echo "USING_LOCAL_SUPABASE=true" >> $GITHUB_ENV
+          else
+            echo "Using configured external Supabase test environment."
+          fi
+
+      - name: Seed Synthetic E2E Admin User
+        run: node tests/e2e/helpers/seed-admin.mjs
 
       - name: Run Connectivity Preflight
         run: node tests/e2e/preflight.mjs
@@ -54,6 +78,14 @@ jobs:
 
       - name: Run E2E Tests
         run: npm run test:e2e -- --project=chromium
+
+      - name: Teardown Ephemeral Local Supabase
+        if: always()
+        run: |
+          if [ "${USING_LOCAL_SUPABASE}" = "true" ]; then
+            echo "Stopping ephemeral local Supabase stack..."
+            npx supabase stop --no-backup
+          fi
 
       - name: Upload Artifacts
         if: failure()

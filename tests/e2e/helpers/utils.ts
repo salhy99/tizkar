@@ -27,8 +27,27 @@ export async function loginAsAdmin(page: Page) {
 import { createClient } from '@supabase/supabase-js';
 
 export async function cleanupTestInvitations(testPrefix: string = 'E2E-') {
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL?.includes('zxrzqyvlydsdczngxxst')) {
-    console.warn('Skipping cleanup because not in known dev project.');
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+  let host = '';
+  try {
+    host = new URL(supabaseUrl).hostname.toLowerCase();
+  } catch {
+    console.warn('Skipping cleanup: invalid Supabase URL.');
+    return;
+  }
+
+  if (host.includes('hnjfxdyterpbmkisaiiw') || host.includes('tizkar.com')) {
+    console.error('FATAL SAFETY BLOCK: Cannot execute cleanup on Production target.');
+    return;
+  }
+
+  const isAllowedTestTarget =
+    host.includes('zxrzqyvlydsdczngxxst') ||
+    host === 'localhost' ||
+    host === '127.0.0.1';
+
+  if (!isAllowedTestTarget) {
+    console.warn('Skipping cleanup because target is not an authorized test environment.');
     return;
   }
   
