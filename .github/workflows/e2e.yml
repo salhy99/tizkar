@@ -26,7 +26,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
 
       - name: Install dependencies
@@ -79,6 +79,18 @@ jobs:
           else
             echo "Using configured external Supabase test environment."
           fi
+
+      - name: Runtime Diagnostic
+        run: |
+          node -e "
+            console.log('Node Version:', process.version);
+            if (typeof WebSocket !== 'undefined') {
+              console.log('Native WebSocket Support: AVAILABLE');
+            } else {
+              console.error('Native WebSocket Support: MISSING');
+              process.exit(1);
+            }
+          "
 
       - name: Seed Synthetic E2E Admin User
         run: node tests/e2e/helpers/seed-admin.mjs
