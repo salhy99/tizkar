@@ -50,6 +50,9 @@ function validateRestoreTarget(urlStr: string) {
   if (parsedUrl.pathname !== '/tizkar_restore_drill') {
     throw new Error(`FATAL: Destination database must be tizkar_restore_drill. Got: ${parsedUrl.pathname}`)
   }
+  if (parsedUrl.username !== 'supabase_admin') {
+    throw new Error(`FATAL: Destination user must be supabase_admin. Got: ${parsedUrl.username}`)
+  }
   if (Array.from(parsedUrl.searchParams.keys()).length > 0) {
     throw new Error(`FATAL: URL query parameters are not allowed.`)
   }
@@ -58,11 +61,12 @@ function validateRestoreTarget(urlStr: string) {
 // Prepare Tests
 console.log(`[TEST] Running Static Isolation Tests...`)
 let testErrors = 0
-try { validateRestoreTarget('postgresql://postgres:postgres@127.0.0.1:54322/tizkar_restore_drill') } catch (e) { testErrors++ }
-try { validateRestoreTarget('postgresql://postgres:postgres@localhost:54322/tizkar_restore_drill'); testErrors++ } catch (e) { /* Expected */ }
-try { validateRestoreTarget('postgresql://postgres:postgres@127.0.0.1:5432/tizkar_restore_drill'); testErrors++ } catch (e) { /* Expected */ }
-try { validateRestoreTarget('postgresql://postgres:postgres@127.0.0.1:54322/production'); testErrors++ } catch (e) { /* Expected */ }
-try { validateRestoreTarget('postgresql://postgres:postgres@127.0.0.1:54322/tizkar_restore_drill?host=/var/run/postgresql'); testErrors++ } catch (e) { /* Expected */ }
+try { validateRestoreTarget('postgresql://supabase_admin:postgres@127.0.0.1:54322/tizkar_restore_drill') } catch (e) { testErrors++ }
+try { validateRestoreTarget('postgresql://postgres:postgres@127.0.0.1:54322/tizkar_restore_drill'); testErrors++ } catch (e) { /* Expected */ }
+try { validateRestoreTarget('postgresql://supabase_admin:postgres@localhost:54322/tizkar_restore_drill'); testErrors++ } catch (e) { /* Expected */ }
+try { validateRestoreTarget('postgresql://supabase_admin:postgres@127.0.0.1:5432/tizkar_restore_drill'); testErrors++ } catch (e) { /* Expected */ }
+try { validateRestoreTarget('postgresql://supabase_admin:postgres@127.0.0.1:54322/production'); testErrors++ } catch (e) { /* Expected */ }
+try { validateRestoreTarget('postgresql://supabase_admin:postgres@127.0.0.1:54322/tizkar_restore_drill?host=/var/run/postgresql'); testErrors++ } catch (e) { /* Expected */ }
 if (process.env.SUPABASE_DB_URL || process.env.DATABASE_URL) {
   throw new Error('FATAL: Production database credentials detected in environment. Aborting restore drill.')
 }
@@ -94,9 +98,9 @@ async function runRestoreDrill() {
 
   try {
     // 2. CONNECTED SERVER IDENTITY CHECK
-    console.log(`[Verify] Verifying Connected Server Identity...`)
-    const identityCheck = await runSql(`SELECT inet_server_addr(), current_database(), current_setting('server_version_num');`)
-    const [ip, dbName, version] = identityCheck.split('|').map(s => s?.trim())
+    console.log(`[Verify] Verifying Connected Server Identity and Privileges...`)
+    const identityCheck = await runSql(`SELECT inet_server_addr(), current_database(), current_setting('server_version_num'), current_user;`)
+    const [ip, dbName, version, currentUser] = identityCheck.split('|').map(s => s?.trim())
     if (!ip || (!ip.includes('127.0.0.1') && ip !== '::1' && !ip.startsWith('172.'))) {
       // Allow docker container IP range (172.x) or localhost
       console.warn(`Warning: Connected server IP is ${ip}. Expected a local/container address.`)
@@ -108,6 +112,13 @@ async function runRestoreDrill() {
       throw new Error(`FATAL: Target PostgreSQL version is not 17+. Got version num: ${version}`)
     }
     console.log(`Identity Check: PASS (${dbName} on PG version ${version})`)
+    
+    // Preflight Privilege Check
+    const privCheck = await runSql(`SELECT rolsuper FROM pg_roles WHERE rolname = current_user;`)
+    if (privCheck.trim() !== 't') {
+      throw new Error(`FATAL: Connected user '${currentUser}' is not a superuser. Required for restoring Supabase managed schemas (e.g., realtime log_min_messages).`)
+    }
+    console.log(`Privilege Check: PASS (User '${currentUser}' is superuser)`)
 
     // 3. Download Backup Artifacts
     console.log(`\n[1] Downloading artifacts from R2...`)
