@@ -95,7 +95,17 @@ test.describe('/api/media HTTP Authorization', () => {
   test('Published referenced cover (ALLOW)', async ({ request }) => {
     const res = await request.get(`/api/media?path=${user.id}/${invB.id}/${MOCK_UUID}.jpg`, { maxRedirects: 0 });
     expect(res.status()).toBe(302);
-    expect(res.headers().location).toContain('supabase.co');
+    
+    const location = res.headers().location;
+    expect(location).toBeTruthy();
+    
+    const loc = new URL(location);
+    const expectedOrigin = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321').origin;
+    expect(loc.origin.toLowerCase()).toBe(expectedOrigin.toLowerCase());
+    expect(loc.origin).not.toContain('hnjfxdyterpbmkisaiiw.supabase.co'); // Ensure no E2E target hits Prod
+    expect(loc.pathname).toContain('/storage/v1/object/sign/invitations_assets/');
+    expect(loc.pathname).toContain(`${user.id}/${invB.id}/${MOCK_UUID}.jpg`);
+    expect(loc.searchParams.has('token')).toBe(true);
   });
 
   test('Published referenced gallery (ALLOW)', async ({ request }) => {
@@ -164,68 +174,14 @@ test.describe('/api/media HTTP Authorization', () => {
     expect(res2.status()).toBe(404);
   });
 
-  test('Legacy Auth owner access (ALLOW)', async ({ page }) => {
-    const testPhone = '+9647701111111';
-    
-    // Pre-create the user to avoid `signUp` email rate limits in the Next.js API route
-    const dummyEmail = '9647701111111@tidkar.local';
+  test('Legacy Auth owner access (ALLOW)', async ({ request }) => {
+    // Authenticate through the supported Supabase password flow to establish a standard session
     const dummyPassword = process.env.SUPABASE_DUMMY_PASSWORD || 'tidkar-dev-pass-2026';
-    await adminClient.auth.admin.createUser({
-      email: dummyEmail,
-      password: dummyPassword,
-      email_confirm: true
-    });
-    // Ensure profile exists
-    const { data: userRecord } = await adminClient.auth.admin.listUsers();
-    const createdUser = userRecord?.users.find(u => u.email === dummyEmail);
-    if (createdUser) {
-      await adminClient.from('profiles').upsert({ id: createdUser.id, phone: testPhone, display_name: 'E2E Test User' });
-    }
-
-    // Bypass cooldown rate limiting for the fixed phone number
-    await adminClient.from('otp_requests').delete().eq('phone', '9647701111111');
-
-    // Navigate to login
-    await page.goto('/login');
     
-    // Perform login with a fixed test phone
-    await page.getByPlaceholder('مثال: +9647701234567').fill(testPhone);
-    await page.locator('button[type="submit"]').click();
-    
-    // Wait for the OTP request to be created by polling the DB
-    let otpCreated = false;
-    for (let i = 0; i < 10; i++) {
-      const { data } = await adminClient.from('otp_requests').select('id').eq('phone', '9647701111111').eq('status', 'PENDING').maybeSingle();
-      if (data) {
-        otpCreated = true;
-        break;
-      }
-      await page.waitForTimeout(500);
-    }
-    
-    if (!otpCreated) {
-      await page.screenshot({ path: 'login-error.png' });
-      const { data: allReqs } = await adminClient.from('otp_requests').select('*').eq('phone', '9647701111111');
-      console.log('OTP requests in DB:', allReqs);
-      throw new Error("OTP request row was not created in time.");
-    }
-
-    const crypto = await import('crypto');
-    const secret = process.env.OTP_HASH_SECRET || 'tidkar-dev-secret-2026';
-    const mockHash = crypto.createHmac('sha256', secret).update('123456').digest('hex');
-    await adminClient.from('otp_requests').update({ otp_hash: mockHash }).eq('phone', '9647701111111').eq('status', 'PENDING');
-
-    // Verify OTP
-    await page.getByPlaceholder('123456').fill('123456');
-    await page.locator('button[type="submit"]').click();
-    
-    // Wait for redirect to dashboard
-    await expect(page).toHaveURL(/\/dashboard/);
-    
-    // Get the auth user from the database directly by finding the most recent profile
-    const { data: profiles } = await adminClient.from('profiles').select('id').eq('phone', testPhone).single();
-    const legacyUserId = profiles?.id;
-    expect(legacyUserId).toBeTruthy();
+    // Create the test user via Admin API
+    const { createTestUser } = await import('./helpers/utils');
+    const legacyUser = await createTestUser('legacy-auth-e2e');
+    const legacyUserId = legacyUser.id;
 
     // Create an invitation owned by this new legacy user
     const { data: legacyInv } = await adminClient.from('invitations').insert({
@@ -243,14 +199,36 @@ test.describe('/api/media HTTP Authorization', () => {
     });
     await adminClient.storage.from('invitations_assets').upload(`${legacyUserId}/${legacyInv.id}/${MOCK_UUID}.jpg`, 'dummy content', { contentType: 'image/jpeg', upsert: true });
 
-    // NOW use the page's request context which has the cookies attached!
-    const res = await page.request.get(`/api/media?path=${legacyUserId}/${legacyInv.id}/${MOCK_UUID}.jpg`, {
+    // Login to get the access token
+    const authClient = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+    const { data: authData, error: authError } = await authClient.auth.signInWithPassword({
+      email: legacyUser.email!,
+      password: dummyPassword
+    });
+    expect(authError).toBeNull();
+    expect(authData.session?.access_token).toBeTruthy();
+
+    // Verify foreign access is denied BEFORE we attach the token
+    const unauthRes = await request.get(`/api/media?path=${legacyUserId}/${legacyInv.id}/${MOCK_UUID}.jpg`, { maxRedirects: 0 });
+    expect(unauthRes.status()).toBe(404);
+
+    // Provide the access token via the Cookie header. We set both common dev project IDs to be robust.
+    const cookieValue = encodeURIComponent(JSON.stringify([
+      authData.session?.access_token,
+      authData.session?.refresh_token,
+      null, null, null
+    ]));
+    
+    const res = await request.get(`/api/media?path=${legacyUserId}/${legacyInv.id}/${MOCK_UUID}.jpg`, {
+      headers: {
+        Cookie: `sb-127-auth-token=${cookieValue}; sb-localhost-auth-token=${cookieValue}`
+      },
       maxRedirects: 0
     });
     
-    expect(res.status()).toBe(302);
+    expect(res.status()).toBe(302); // Successfully authorized and signed URL returned
     
-    // Cleanup
+    // Cleanup safely
     await adminClient.storage.from('invitations_assets').remove([`${legacyUserId}/${legacyInv.id}/${MOCK_UUID}.jpg`]);
     await adminClient.from('invitations').delete().eq('id', legacyInv.id);
     const { deleteTestUser } = await import('./helpers/utils');

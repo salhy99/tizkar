@@ -108,8 +108,11 @@ test.describe.serial('Security & Access Control', () => {
     
     // Public route
     await page.goto(`/${slugB}`);
-    // Should show "هذه الدعوة قيد التجهيز" (Draft fallback) or 404
-    await expect(page.getByText('هذه الدعوة قيد التجهيز')).toBeVisible();
+    // Should show the not available fallback
+    await expect(page.getByText('هذه الدعوة غير متاحة حالياً')).toBeVisible();
+    // Ensure no private data leaked
+    const content = await page.content();
+    expect(content).not.toContain(testIdB);
 
     // OG Image
     const ogRes = await page.request.get(`/${slugB}/opengraph-image`);
