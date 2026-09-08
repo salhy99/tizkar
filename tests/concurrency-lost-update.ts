@@ -1,4 +1,4 @@
-// @ts-nocheck
+
 import { createClient } from '@supabase/supabase-js'
 import * as dotenv from 'dotenv'
 dotenv.config({ path: '.env.local' })
@@ -11,7 +11,9 @@ async function run() {
   console.log('--- JSON Lost Update Test ---')
   
   const { data: template } = await supabase.from('templates').select('id, event_type_id').limit(1).single()
+  if (!template) throw new Error('No template')
   const { data: user } = await supabase.from('profiles').select('id').limit(1).single()
+  if (!user) throw new Error('No user')
 
   // 1. Create a draft invitation
   const { data: inv, error: invErr } = await supabase
@@ -27,7 +29,7 @@ async function run() {
     .select('id')
     .single()
 
-  if (invErr) {
+  if (invErr || !inv) {
     console.error('Failed to create invitation:', invErr)
     return
   }
@@ -45,23 +47,29 @@ async function run() {
   const r1 = await supabase.rpc('reserve_media_upload_slot', { p_invitation_id: invitationId, p_category: 'gallery', p_max_images: 10 })
   const r2 = await supabase.rpc('reserve_media_upload_slot', { p_invitation_id: invitationId, p_category: 'gallery', p_max_images: 10 })
   
-  await supabase.rpc('confirm_media_upload_slot', { p_reservation_id: r1.data.reservation_id, p_invitation_id: invitationId, p_path: 'pathA' })
-  await supabase.rpc('confirm_media_upload_slot', { p_reservation_id: r2.data.reservation_id, p_invitation_id: invitationId, p_path: 'pathB' })
+  if (!r1.data || !r2.data) throw new Error('Reservations failed')
+  const r1Data = r1.data as { reservation_id: string }
+  const r2Data = r2.data as { reservation_id: string }
+  
+  await supabase.rpc('confirm_media_upload_slot', { p_reservation_id: r1Data.reservation_id, p_invitation_id: invitationId, p_path: 'pathA' })
+  await supabase.rpc('confirm_media_upload_slot', { p_reservation_id: r2Data.reservation_id, p_invitation_id: invitationId, p_path: 'pathB' })
 
   // 4. Concurrently commit uploads and autosave title
   console.log('Launching concurrent operations...')
-  const p1 = supabase.rpc('commit_media_upload_atomic', { p_invitation_id: invitationId, p_reservation_id: r1.data.reservation_id, p_storage_path: 'pathA', p_category: 'gallery' })
-  const p2 = supabase.rpc('commit_media_upload_atomic', { p_invitation_id: invitationId, p_reservation_id: r2.data.reservation_id, p_storage_path: 'pathB', p_category: 'gallery' })
+  const p1 = supabase.rpc('commit_media_upload_atomic', { p_invitation_id: invitationId, p_reservation_id: r1Data.reservation_id, p_storage_path: 'pathA', p_category: 'gallery' })
+  const p2 = supabase.rpc('commit_media_upload_atomic', { p_invitation_id: invitationId, p_reservation_id: r2Data.reservation_id, p_storage_path: 'pathB', p_category: 'gallery' })
   const p3 = supabase.rpc('update_invitation_data_atomic', { p_invitation_id: invitationId, p_new_data: { title: 'Updated Title' } })
 
   await Promise.all([p1, p2, p3])
 
   // 5. Verify final state
   const { data: ver } = await supabase.from('invitation_versions').select('invitation_data').eq('invitation_id', invitationId).eq('is_published', false).single()
+  if (!ver || !ver.invitation_data) throw new Error('No version data')
+  const invData = ver.invitation_data as { gallery: string[], title: string }
   
-  console.log('Final Data:', JSON.stringify(ver.invitation_data, null, 2))
+  console.log('Final Data:', JSON.stringify(invData, null, 2))
 
-  if (ver.invitation_data.gallery.includes('pathA') && ver.invitation_data.gallery.includes('pathB') && ver.invitation_data.title === 'Updated Title') {
+  if (invData.gallery.includes('pathA') && invData.gallery.includes('pathB') && invData.title === 'Updated Title') {
     console.log('SUCCESS: All changes survived!')
   } else {
     console.log('FAILED: Lost update occurred!')

@@ -52,7 +52,7 @@ async function runDatabaseBackup() {
     const pgDumpBinary = process.env.PG_DUMP_BIN || '/usr/lib/postgresql/17/bin/pg_dump'
 
     // We use the custom format (-Fc) which is compressed and suitable for pg_restore.
-    const { stdout, stderr } = await execFileAsync(pgDumpBinary, [
+    const { stderr } = await execFileAsync(pgDumpBinary, [
       '-Fc',
       '--no-owner',
       '--no-acl',

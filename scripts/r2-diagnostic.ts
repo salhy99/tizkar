@@ -45,9 +45,11 @@ const s3Client = new S3Client({
   }
 });
 
-async function describeError(error: any): Promise<string> {
-  const code = error.name || error.Code || 'UnknownError';
-  const status = error.$metadata?.httpStatusCode || 'N/A';
+async function describeError(error: unknown): Promise<string> {
+  const err = (error || {}) as Record<string, unknown>;
+  const code = err.name || err.Code || 'UnknownError';
+  const metadata = err.$metadata as Record<string, unknown> | undefined;
+  const status = metadata?.httpStatusCode || 'N/A';
   
   if (status === 403 || code === 'AccessDenied') {
     return `AccessDenied (${status}): Credentials lack permission for this operation on the target bucket. Check if the token has read access to '${bucket}' in the correct Cloudflare account.`;
@@ -71,7 +73,7 @@ async function runDiagnostic() {
     console.log(`DUMP_EXISTS: YES`);
     console.log(`DUMP_SIZE: ${head.ContentLength} bytes`);
     dumpFound = true;
-  } catch (error: any) {
+  } catch (error: unknown) {
     const desc = await describeError(error);
     console.log(`DUMP_HEAD_STATUS: ${desc}`);
     console.log(`DUMP_EXISTS: NO`);
@@ -85,7 +87,7 @@ async function runDiagnostic() {
     console.log(`MANIFEST_EXISTS: YES`);
     console.log(`MANIFEST_SIZE: ${head.ContentLength} bytes`);
     manifestFound = true;
-  } catch (error: any) {
+  } catch (error: unknown) {
     const desc = await describeError(error);
     console.log(`MANIFEST_HEAD_STATUS: ${desc}`);
     console.log(`MANIFEST_EXISTS: NO`);
@@ -111,7 +113,7 @@ async function runDiagnostic() {
         console.log(`No objects found under prefix. The bucket exists in the authenticated account, but it is empty or missing these specific backups.`);
         console.log(`-> POSSIBLE MISMATCH: The Access Key used here might point to a DIFFERENT Cloudflare account that happens to have an empty '${bucket}' bucket.`);
       }
-    } catch (listErr: any) {
+    } catch (listErr: unknown) {
       const desc = await describeError(listErr);
       console.log(`LIST_STATUS: ${desc}`);
       if (desc.includes('NoSuchBucket')) {

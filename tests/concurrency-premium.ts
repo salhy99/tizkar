@@ -1,4 +1,4 @@
-// @ts-nocheck
+
 import { createClient } from '@supabase/supabase-js'
 import * as dotenv from 'dotenv'
 dotenv.config({ path: '.env.local' })
@@ -11,7 +11,9 @@ async function run() {
   console.log('--- Premium Unlimited RSVP Test ---')
   
   const { data: template } = await supabase.from('templates').select('id, event_type_id').limit(1).single()
+  if (!template) throw new Error('No template')
   const { data: user } = await supabase.from('profiles').select('id').limit(1).single()
+  if (!user) throw new Error('No user')
 
   const { data: inv, error: invErr } = await supabase
     .from('invitations')
@@ -26,7 +28,7 @@ async function run() {
     .select('id')
     .single()
 
-  if (invErr) {
+  if (invErr || !inv) {
     console.error('Failed to create invitation:', invErr)
     return
   }
@@ -54,7 +56,7 @@ async function run() {
   let successes = 0
   let denials = 0
   results.forEach(r => {
-    if (r.data && r.data.success) successes++
+    if (r.data && (r.data as { success: boolean }).success) successes++
     else denials++
   })
 

@@ -284,8 +284,6 @@ export async function deleteMedia(invitationId: string, path: string) {
       p_path: path
     })
     
-    // Atomically remove it from the gallery/music JSONB state
-    const category = path.includes('/gallery/') ? 'gallery' : 'music'; // rudimentary but effective based on our path structure, actually we can just pass category if we want, but let's try both or just pass it in.
     // Wait, deleteMedia doesn't take category. Let's just pass 'gallery'. If it's music, we pass 'music'.
     // The path contains the category because we generate it as: `${userId}/${invitationId}/${category}/${uuid}`
     const detectedCategory = path.includes('/music/') ? 'music' : 'gallery';
@@ -304,7 +302,7 @@ export async function deleteMedia(invitationId: string, path: string) {
 
 export async function reorderGallery(invitationId: string, newGallery: string[]) {
   try {
-    const { userId } = await verifyAuthAndOwnership(invitationId)
+    await verifyAuthAndOwnership(invitationId)
     const adminClient = getAdminClient()
     const { error } = await adminClient.rpc('reorder_gallery_atomic', {
       p_invitation_id: invitationId,
@@ -312,14 +310,14 @@ export async function reorderGallery(invitationId: string, newGallery: string[])
     })
     if (error) throw error
     return { success: true }
-  } catch (err: unknown) {
+  } catch {
     return { success: false, error: 'Failed to reorder' }
   }
 }
 
 export async function setCoverImage(invitationId: string, path: string | undefined) {
   try {
-    const { userId } = await verifyAuthAndOwnership(invitationId)
+    await verifyAuthAndOwnership(invitationId)
     const adminClient = getAdminClient()
     const { error } = await adminClient.rpc('set_cover_atomic', {
       p_invitation_id: invitationId,
@@ -327,7 +325,7 @@ export async function setCoverImage(invitationId: string, path: string | undefin
     })
     if (error) throw error
     return { success: true }
-  } catch (err: unknown) {
+  } catch {
     return { success: false, error: 'Failed to set cover' }
   }
 }

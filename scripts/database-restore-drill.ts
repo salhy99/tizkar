@@ -14,7 +14,6 @@ const streamPipeline = promisify(pipeline)
 
 const PINNED_BACKUP_ID = 'db-backup-2026-09-06T23-03-28-065Z'
 const EXPECTED_SHA256 = '9d5cdff8633b57e263911bbb089300f52ea9ca0ce992d79567d7cfa309079871'
-const EXPECTED_SIZE = 328524
 
 const requiredEnvs = [
   'BACKUP_S3_ENDPOINT',
@@ -37,7 +36,7 @@ function validateRestoreTarget(urlStr: string) {
   let parsedUrl: URL
   try {
     parsedUrl = new URL(urlStr)
-  } catch (e) {
+  } catch {
     throw new Error('FATAL: LOCAL_DISPOSABLE_DB_URL is malformed.')
   }
 
@@ -61,12 +60,12 @@ function validateRestoreTarget(urlStr: string) {
 // Prepare Tests
 console.log(`[TEST] Running Static Isolation Tests...`)
 let testErrors = 0
-try { validateRestoreTarget('postgresql://supabase_admin:postgres@127.0.0.1:54322/tizkar_restore_drill') } catch (e) { testErrors++ }
-try { validateRestoreTarget('postgresql://postgres:postgres@127.0.0.1:54322/tizkar_restore_drill'); testErrors++ } catch (e) { /* Expected */ }
-try { validateRestoreTarget('postgresql://supabase_admin:postgres@localhost:54322/tizkar_restore_drill'); testErrors++ } catch (e) { /* Expected */ }
-try { validateRestoreTarget('postgresql://supabase_admin:postgres@127.0.0.1:5432/tizkar_restore_drill'); testErrors++ } catch (e) { /* Expected */ }
-try { validateRestoreTarget('postgresql://supabase_admin:postgres@127.0.0.1:54322/production'); testErrors++ } catch (e) { /* Expected */ }
-try { validateRestoreTarget('postgresql://supabase_admin:postgres@127.0.0.1:54322/tizkar_restore_drill?host=/var/run/postgresql'); testErrors++ } catch (e) { /* Expected */ }
+try { validateRestoreTarget('postgresql://supabase_admin:postgres@127.0.0.1:54322/tizkar_restore_drill') } catch { testErrors++ }
+try { validateRestoreTarget('postgresql://postgres:postgres@127.0.0.1:54322/tizkar_restore_drill'); testErrors++ } catch { /* Expected */ }
+try { validateRestoreTarget('postgresql://supabase_admin:postgres@localhost:54322/tizkar_restore_drill'); testErrors++ } catch { /* Expected */ }
+try { validateRestoreTarget('postgresql://supabase_admin:postgres@127.0.0.1:5432/tizkar_restore_drill'); testErrors++ } catch { /* Expected */ }
+try { validateRestoreTarget('postgresql://supabase_admin:postgres@127.0.0.1:54322/production'); testErrors++ } catch { /* Expected */ }
+try { validateRestoreTarget('postgresql://supabase_admin:postgres@127.0.0.1:54322/tizkar_restore_drill?host=/var/run/postgresql'); testErrors++ } catch { /* Expected */ }
 if (process.env.SUPABASE_DB_URL || process.env.DATABASE_URL) {
   throw new Error('FATAL: Production database credentials detected in environment. Aborting restore drill.')
 }
@@ -125,11 +124,11 @@ async function runRestoreDrill() {
     
     const dumpKey = `tizkar-production/database/${dumpFilename}`
     const dumpData = await s3Client.send(new GetObjectCommand({ Bucket: process.env.BACKUP_S3_BUCKET!, Key: dumpKey }))
-    await streamPipeline(dumpData.Body as any, fs.createWriteStream(dumpPath))
+    await streamPipeline(dumpData.Body as NodeJS.ReadableStream, fs.createWriteStream(dumpPath))
     
     const manifestKey = `tizkar-production/database/${manifestFilename}`
     const manifestData = await s3Client.send(new GetObjectCommand({ Bucket: process.env.BACKUP_S3_BUCKET!, Key: manifestKey }))
-    await streamPipeline(manifestData.Body as any, fs.createWriteStream(manifestPath))
+    await streamPipeline(manifestData.Body as NodeJS.ReadableStream, fs.createWriteStream(manifestPath))
 
     // 4. Validate Artifacts
     console.log(`\n[2] Validating Backup Integrity...`)

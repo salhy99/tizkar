@@ -1,4 +1,4 @@
-// @ts-nocheck
+
 import { createClient } from '@supabase/supabase-js'
 import * as dotenv from 'dotenv'
 dotenv.config({ path: '.env.local' })
@@ -11,7 +11,9 @@ async function testRsvpConcurrency() {
   console.log('--- RSVP Concurrency Test ---')
   
   const { data: template } = await supabase.from('templates').select('id, event_type_id').limit(1).single()
+  if (!template) throw new Error('No template')
   const { data: user } = await supabase.from('profiles').select('id').limit(1).single()
+  if (!user) throw new Error('No user')
 
   // 1. Create a draft invitation
   const { data: inv, error: invErr } = await supabase
@@ -27,7 +29,7 @@ async function testRsvpConcurrency() {
     .select('id')
     .single()
 
-  if (invErr) {
+  if (invErr || !inv) {
     console.error('Failed to create invitation:', invErr)
     return
   }
@@ -71,7 +73,7 @@ async function testRsvpConcurrency() {
   let successes = 0
   let denials = 0
   results.forEach(r => {
-    if (r.data && r.data.success) successes++
+    if (r.data && (r.data as { success: boolean }).success) successes++
     else denials++
   })
 
@@ -95,7 +97,9 @@ async function testMediaConcurrency() {
   console.log('\n--- Media Concurrency Test ---')
   
   const { data: template } = await supabase.from('templates').select('id, event_type_id').limit(1).single()
+  if (!template) throw new Error('No template')
   const { data: user } = await supabase.from('profiles').select('id').limit(1).single()
+  if (!user) throw new Error('No user')
 
   // 1. Create a draft invitation
   const { data: inv, error: invErr } = await supabase
@@ -111,7 +115,7 @@ async function testMediaConcurrency() {
     .select('id')
     .single()
 
-  if (invErr) {
+  if (invErr || !inv) {
     console.error('Failed to create invitation:', invErr)
     return
   }
@@ -147,7 +151,7 @@ async function testMediaConcurrency() {
   let successes = 0
   let denials = 0
   results.forEach(r => {
-    if (r.data && r.data.success) successes++
+    if (r.data && (r.data as { success: boolean }).success) successes++
     else denials++
   })
 
