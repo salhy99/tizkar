@@ -13,6 +13,14 @@ export interface DrillResult {
   hash?: string;
 }
 
+export function extractSha256(metadata?: Record<string, string>): string | undefined {
+  if (!metadata) return undefined;
+  for (const [k, v] of Object.entries(metadata)) {
+    if (k.toLowerCase() === 'x-tizkar-sha256') return v;
+  }
+  return undefined;
+}
+
 export async function verifyLegacyObject(
   s3: S3Client,
   bucketName: string,
@@ -32,7 +40,7 @@ export async function verifyLegacyObject(
   try {
     const head = await s3.send(new HeadObjectCommand({ Bucket: bucketName, Key: key }));
     const expectedSize = head.ContentLength || 0;
-    const expectedHash = head.Metadata?.['x-tizkar-sha256'] || head.Metadata?.['X-Tizkar-Sha256'] || head.Metadata?.['X-TIZKAR-SHA256'];
+    const expectedHash = extractSha256(head.Metadata);
 
     if (!expectedHash) {
       return { key, status: 'NOT_VERIFIED', reason: 'Missing x-tizkar-sha256 metadata' };

@@ -33,7 +33,7 @@ const s3 = new S3Client({
 const RESTORE_DIR = path.join(process.cwd(), '.storage_restore');
 
 async function cleanup() {
-  console.log(`[RestoreDrill] Cleaning up disposable directory: ${RESTORE_DIR}`);
+  console.log(`[RestoreDrill] Cleaning up disposable directory.`);
   if (existsSync(RESTORE_DIR)) {
     await fsPromises.rm(RESTORE_DIR, { recursive: true, force: true });
   }
@@ -41,9 +41,14 @@ async function cleanup() {
 
 async function runDrill() {
   console.log(`[RestoreDrill] Starting Legacy Mirror Restore Drill (Bounded)`);
-  console.log(`[RestoreDrill] Bucket: ${bucketName}`);
   
-  await cleanup();
+  try {
+    await cleanup();
+  } catch (err) {
+    console.error('[RestoreDrill] CLEANUP_FAILED (initial):', err);
+    process.exit(1);
+  }
+  
   mkdirSync(RESTORE_DIR, { recursive: true });
 
   let totalBytes = 0;
@@ -58,30 +63,25 @@ async function runDrill() {
 
     const objects = listResponse.Contents || [];
     if (objects.length === 0) {
-      console.log(`[RestoreDrill] No objects found in bucket.`);
+      console.log(`[RestoreDrill] NO_APPROVED_SAMPLE: No objects found in bucket.`);
       return;
     }
 
     const selectedKeys: { key: string, size: number }[] = [];
     let selectedBytes = 0;
 
-    const allowRealMedia = process.env.ALLOW_REAL_CUSTOMER_MEDIA === 'true';
-
     for (const obj of objects) {
       if (!obj.Key || typeof obj.Size !== 'number') continue;
       
       if (obj.Size > MAX_OBJECT_SIZE) {
-        console.log(`[RestoreDrill] Skipping ${obj.Key} (Exceeds max object size: ${obj.Size} bytes)`);
+        // Exclude object key from logs
         continue;
       }
 
-      // Safe sample selection constraint
-      if (!allowRealMedia) {
-        const isSynthetic = obj.Key.startsWith('synthetic/') || obj.Key.startsWith('test/') || obj.Key.includes('test-fixture');
-        if (!isSynthetic) {
-          console.log(`[RestoreDrill] Skipping ${obj.Key} (Real customer media requires ALLOW_REAL_CUSTOMER_MEDIA=true)`);
-          continue;
-        }
+      // Safe sample selection constraint: MUST be synthetic
+      const isSynthetic = obj.Key.startsWith('synthetic/') || obj.Key.startsWith('test/') || obj.Key.includes('test-fixture');
+      if (!isSynthetic) {
+        continue;
       }
       
       if (selectedKeys.length >= MAX_OBJECTS) break;
@@ -92,15 +92,15 @@ async function runDrill() {
     }
 
     if (selectedKeys.length === 0) {
-      console.log(`[RestoreDrill] No objects matched selection criteria. (If you meant to test real media, operator approval is required via ALLOW_REAL_CUSTOMER_MEDIA=true)`);
+      console.log(`[RestoreDrill] NO_APPROVED_SAMPLE: No approved synthetic/test objects found in the selection batch.`);
       return;
     }
 
-    console.log(`[RestoreDrill] Selected ${selectedKeys.length} object(s) totaling ${selectedBytes} bytes.`);
+    console.log(`[RestoreDrill] Selected ${selectedKeys.length} synthetic object(s) totaling ${selectedBytes} bytes.`);
 
     for (const { key, size } of selectedKeys) {
       objectsProcessed++;
-      console.log(`\n[RestoreDrill] Processing [${objectsProcessed}/${selectedKeys.length}]: ${key}`);
+      console.log(`\n[RestoreDrill] Processing synthetic object [${objectsProcessed}/${selectedKeys.length}]`);
 
       const result = await verifyLegacyObject(s3, bucketName!, key, size, RESTORE_DIR, MAX_OBJECT_SIZE);
 
@@ -108,7 +108,8 @@ async function runDrill() {
         console.log(`[RestoreDrill] PASS: Verified ${result.bytesVerified} bytes. Hash: ${result.hash}`);
         totalBytes += result.bytesVerified!;
       } else {
-        console.error(`[RestoreDrill] ${result.status}: ${result.reason}`);
+        // Exclude actual key from error logs
+        console.error(`[RestoreDrill] ${result.status}: Verification failed for object_${objectsProcessed} - Reason: ${result.reason}`);
         hasFailure = true;
       }
     }
@@ -118,24 +119,21 @@ async function runDrill() {
     console.log(`Total Bytes Verified: ${totalBytes}`);
     console.log(`Result: ${hasFailure ? 'FAILED' : 'PASS'}`);
 
-    if (hasFailure) {
-      process.exit(1);
-    }
-
   } catch (err: any) {
-    console.error(`[RestoreDrill] FATAL Error:`, err);
-    try {
-      await cleanup();
-    } catch (cleanupErr) {
-      console.error(`[RestoreDrill] CLEANUP_FAILED:`, cleanupErr);
-    }
+    console.error(`[RestoreDrill] FATAL Error during drill execution (details omitted for safety).`);
+    hasFailure = true;
+  }
+
+  // Final cleanup and exit logic
+  try {
+    await cleanup();
+  } catch (cleanupErr) {
+    console.error(`[RestoreDrill] CLEANUP_FAILED:`, cleanupErr);
     process.exit(1);
-  } finally {
-    try {
-      await cleanup();
-    } catch (cleanupErr) {
-      console.error(`[RestoreDrill] CLEANUP_FAILED:`, cleanupErr);
-    }
+  }
+
+  if (hasFailure) {
+    process.exit(1);
   }
 }
 

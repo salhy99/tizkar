@@ -1,6 +1,6 @@
 import test, { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { verifyLegacyObject } from '../src/lib/storage/backup/snapshot/drill-verifier';
+import { verifyLegacyObject, extractSha256 } from '../src/lib/storage/backup/snapshot/drill-verifier';
 import { S3Client, HeadObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { Readable } from 'stream';
 import { promises as fsPromises, existsSync, rmSync, mkdirSync } from 'fs';
@@ -36,6 +36,22 @@ describe('Legacy Mirror Restore Drill Verifier', () => {
     if (existsSync(TEST_DIR)) {
       rmSync(TEST_DIR, { recursive: true, force: true });
     }
+  });
+
+  describe('extractSha256 metadata extraction', () => {
+    it('returns undefined if no metadata', () => {
+      assert.strictEqual(extractSha256(undefined), undefined);
+      assert.strictEqual(extractSha256({}), undefined);
+    });
+    
+    it('extracts exact lowercase match', () => {
+      assert.strictEqual(extractSha256({ 'x-tizkar-sha256': 'hash123' }), 'hash123');
+    });
+
+    it('extracts case-insensitive match (AWS SDK v2/v3 variation)', () => {
+      assert.strictEqual(extractSha256({ 'X-Tizkar-Sha256': 'hash123' }), 'hash123');
+      assert.strictEqual(extractSha256({ 'X-TIZKAR-SHA256': 'hash123' }), 'hash123');
+    });
   });
 
   it('rejects an unsafe storage path', async () => {
