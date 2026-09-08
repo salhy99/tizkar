@@ -54,20 +54,35 @@ test.describe.serial('Security & Access Control', () => {
     }
 
     // Attempt to access Editor B using Context A
-    await pageA.goto(editorUrlB);
+    const res = await pageA.goto(editorUrlB);
     
-    // Should be denied (redirected to /recover or 401/not found)
-    // Tizkar redirects unauthorized to /login or /recover or shows 'Not Authorized'
-    // Actually, Tizkar shows a specific login/recover form for that invitation if unauthorized.
-    await expect(pageA).not.toHaveURL(editorUrlB);
+    // The server should either return a 404 Not Found (via notFound()) or redirect
+    if (pageA.url() === editorUrlB) {
+      // If it stays on the same URL, it MUST be a 404 Not Found page or auth gate.
+      expect(res?.status()).toBe(404);
+      // Ensure the actual editor UI (like "حفظ", "نشر", "ضيوف") is not available.
+      await expect(pageA.getByRole('button', { name: 'حفظ' })).not.toBeVisible();
+      await expect(pageA.getByRole('button', { name: 'نشر' })).not.toBeVisible();
+      
+      // Explicitly check that private data is not returned in HTML or DOM
+      const content = await pageA.content();
+      expect(content).not.toContain(testIdB); // B's title/data must not leak
+    } else {
+      // It redirected successfully away from the editor
+      expect(pageA.url()).not.toBe(editorUrlB);
+    }
     
     // Attempt to access Guests B
-    await pageA.goto(editorUrlB.replace('/edit', '/editor') + '/guests');
-    await expect(pageA).not.toHaveURL(editorUrlB.replace('/edit', '/editor') + '/guests');
-
+    const guestsRes = await pageA.goto(editorUrlB.replace('/edit', '/editor') + '/guests');
+    if (pageA.url() === editorUrlB.replace('/edit', '/editor') + '/guests') {
+      expect(guestsRes?.status()).toBe(404);
+    }
+    
     // Attempt to access Share B
-    await pageA.goto(editorUrlB.replace('/edit', '/editor') + '/share');
-    await expect(pageA).not.toHaveURL(editorUrlB.replace('/edit', '/editor') + '/share');
+    const shareRes = await pageA.goto(editorUrlB.replace('/edit', '/editor') + '/share');
+    if (pageA.url() === editorUrlB.replace('/edit', '/editor') + '/share') {
+      expect(shareRes?.status()).toBe(404);
+    }
     
     await contextA.close();
   });

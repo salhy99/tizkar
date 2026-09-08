@@ -20,20 +20,23 @@ test.describe('/api/media HTTP Authorization', () => {
   let invD: { id: string, slug: string };
 
   const MOCK_UUID = '123e4567-e89b-42d3-a456-426614174000';
+  let foreignUserId: string;
 
   test.beforeAll(async () => {
-    // Get existing users to avoid rate limits
-    const { data: users, error: userError } = await adminClient.auth.admin.listUsers();
-    if (userError || !users?.users?.length || users.users.length < 2) throw new Error('At least two users needed');
-    user = users.users[0];
-    const foreignUser = users.users[1];
+    // Create distinct synthetic users
+    const { createTestUser } = await import('./helpers/utils');
+    const createdUser = await createTestUser('media-owner');
+    const createdForeignUser = await createTestUser('media-foreign');
+    
+    user = createdUser;
+    foreignUserId = createdForeignUser.id;
 
     // Create synthetic invitations
     const { data: invs, error: invError } = await adminClient.from('invitations').insert([
       { user_id: user.id, title: 'Draft Inv', status: 'DRAFT', slug: `draft-${Date.now()}` },
       { user_id: user.id, title: 'Published Inv', status: 'PUBLISHED', slug: `pub-${Date.now()}` },
       { user_id: user.id, title: 'Expired Inv', status: 'PUBLISHED', slug: `exp-${Date.now()}`, expires_at: new Date(Date.now() - 10000).toISOString() },
-      { user_id: foreignUser.id, title: 'Foreign Inv', status: 'PUBLISHED', slug: `foreign-${Date.now()}` }
+      { user_id: foreignUserId, title: 'Foreign Inv', status: 'PUBLISHED', slug: `foreign-${Date.now()}` }
     ]).select();
 
     if (invError) throw invError;
@@ -43,7 +46,7 @@ test.describe('/api/media HTTP Authorization', () => {
     await adminClient.from('invitation_versions').insert([
       { invitation_id: invB.id, is_published: true, invitation_data: { coverImage: `${user.id}/${invB.id}/${MOCK_UUID}.jpg`, gallery: [`${user.id}/${invB.id}/${MOCK_UUID}.png`], music: { type: 'MP3', url: `${user.id}/${invB.id}/${MOCK_UUID}.mp3` } } },
       { invitation_id: invC.id, is_published: true, invitation_data: { coverImage: `${user.id}/${invC.id}/${MOCK_UUID}.jpg` } },
-      { invitation_id: invD.id, is_published: true, invitation_data: { coverImage: `${foreignUser.id}/${invD.id}/${MOCK_UUID}.jpg` } }
+      { invitation_id: invD.id, is_published: true, invitation_data: { coverImage: `${foreignUserId}/${invD.id}/${MOCK_UUID}.jpg` } }
     ]);
 
     // Upload dummy files to Storage
@@ -67,16 +70,26 @@ test.describe('/api/media HTTP Authorization', () => {
   });
 
   test.afterAll(async () => {
-    const paths = [
-      `${user.id}/${invB.id}/${MOCK_UUID}.jpg`,
-      `${user.id}/${invB.id}/${MOCK_UUID}.png`,
-      `${user.id}/${invB.id}/${MOCK_UUID}.mp3`,
-      `${user.id}/${invA.id}/${MOCK_UUID}.jpg`,
-      `${user.id}/${invB.id}/${MOCK_UUID}_orphan.png`,
-      `${user.id}/${invC.id}/${MOCK_UUID}.jpg`
-    ];
-    await adminClient.storage.from('invitations_assets').remove(paths);
-    await adminClient.from('invitations').delete().in('id', [invA.id, invB.id, invC.id, invD.id]);
+    if (user && invB && invA && invC) {
+      const paths = [
+        `${user.id}/${invB.id}/${MOCK_UUID}.jpg`,
+        `${user.id}/${invB.id}/${MOCK_UUID}.png`,
+        `${user.id}/${invB.id}/${MOCK_UUID}.mp3`,
+        `${user.id}/${invA.id}/${MOCK_UUID}.jpg`,
+        `${user.id}/${invB.id}/${MOCK_UUID}_orphan.png`,
+        `${user.id}/${invC.id}/${MOCK_UUID}.jpg`
+      ];
+      await adminClient.storage.from('invitations_assets').remove(paths);
+    }
+    
+    const invIds = [invA?.id, invB?.id, invC?.id, invD?.id].filter(Boolean) as string[];
+    if (invIds.length > 0) {
+      await adminClient.from('invitations').delete().in('id', invIds);
+    }
+    
+    const { deleteTestUser } = await import('./helpers/utils');
+    if (user?.id) await deleteTestUser(user.id);
+    if (foreignUserId) await deleteTestUser(foreignUserId);
   });
 
   test('Published referenced cover (ALLOW)', async ({ request }) => {
@@ -240,5 +253,7 @@ test.describe('/api/media HTTP Authorization', () => {
     // Cleanup
     await adminClient.storage.from('invitations_assets').remove([`${legacyUserId}/${legacyInv.id}/${MOCK_UUID}.jpg`]);
     await adminClient.from('invitations').delete().eq('id', legacyInv.id);
+    const { deleteTestUser } = await import('./helpers/utils');
+    await deleteTestUser(legacyUserId);
   });
 });
