@@ -1,5 +1,5 @@
 import { S3Client, HeadObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
-import { createWriteStream, promises as fsPromises } from 'fs';
+import { createWriteStream, createReadStream, promises as fsPromises } from 'fs';
 import { pipeline } from 'stream/promises';
 import { computeStreamHash } from './hasher';
 import { isSafeStoragePath } from './validation';
@@ -66,7 +66,7 @@ export async function verifyLegacyObject(
       return { key, status: 'FAILED', reason: `Downloaded size (${stat.size}) does not match expected size (${expectedSize})` };
     }
 
-    const readStream = require('fs').createReadStream(destPath);
+    const readStream = createReadStream(destPath);
     const computedHash = await computeStreamHash(readStream);
 
     if (computedHash !== expectedHash) {
@@ -79,13 +79,16 @@ export async function verifyLegacyObject(
       bytesVerified: stat.size,
       hash: computedHash
     };
-  } catch (err: any) {
-    if (err.name === 'AccessDenied') {
-      return { key, status: 'FAILED', reason: 'AccessDenied' };
+  } catch (err: unknown) {
+    if (err instanceof Error) {
+      if (err.name === 'AccessDenied') {
+        return { key, status: 'FAILED', reason: 'AccessDenied' };
+      }
+      if (err.name === 'NoSuchBucket' || err.name === 'NotFound' || err.name === 'NoSuchKey') {
+        return { key, status: 'FAILED', reason: err.name };
+      }
+      return { key, status: 'FAILED', reason: err.message };
     }
-    if (err.name === 'NoSuchBucket' || err.name === 'NotFound' || err.name === 'NoSuchKey') {
-      return { key, status: 'FAILED', reason: err.name };
-    }
-    return { key, status: 'FAILED', reason: err.message };
+    return { key, status: 'FAILED', reason: 'Unknown error occurred' };
   }
 }

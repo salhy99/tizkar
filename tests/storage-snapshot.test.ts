@@ -2,7 +2,7 @@ import { isSafeStoragePath, validateManifestSchema, computeManifestIntegrity } f
 import { SnapshotManifest } from '../src/lib/storage/backup/snapshot/types';
 import { computeStreamHash } from '../src/lib/storage/backup/snapshot/hasher';
 import { Readable } from 'stream';
-import test, { describe, it } from 'node:test';
+import { describe, it } from 'node:test';
 import assert from 'node:assert';
 
 describe('Storage Snapshot Path Validation', () => {
@@ -108,19 +108,19 @@ describe('Snapshot Manifest Validation', () => {
 
 describe('Manifest Integrity Hashing', () => {
   it('computes deterministic hash ignoring key order', () => {
-    const m1: any = { a: 1, b: 2, c: [3, 4] };
-    const m2: any = { b: 2, c: [3, 4], a: 1 }; // different key order
+    const m1: Record<string, unknown> = { a: 1, b: 2, c: [3, 4] };
+    const m2: Record<string, unknown> = { b: 2, c: [3, 4], a: 1 }; // different key order
     
-    const hash1 = computeManifestIntegrity(m1 as SnapshotManifest);
-    const hash2 = computeManifestIntegrity(m2 as SnapshotManifest);
+    const hash1 = computeManifestIntegrity(m1 as unknown as SnapshotManifest);
+    const hash2 = computeManifestIntegrity(m2 as unknown as SnapshotManifest);
     assert.strictEqual(hash1, hash2);
   });
   
   it('ignores manifest_integrity_sha256 field itself', () => {
-    const m1: any = { snapshot_id: 'x' };
-    const m2: any = { snapshot_id: 'x', manifest_integrity_sha256: 'old_hash' };
+    const m1: Record<string, unknown> = { snapshot_id: 'x' };
+    const m2: Record<string, unknown> = { snapshot_id: 'x', manifest_integrity_sha256: 'old_hash' };
     
-    assert.strictEqual(computeManifestIntegrity(m1), computeManifestIntegrity(m2));
+    assert.strictEqual(computeManifestIntegrity(m1 as unknown as SnapshotManifest), computeManifestIntegrity(m2 as unknown as SnapshotManifest));
   });
 });
 

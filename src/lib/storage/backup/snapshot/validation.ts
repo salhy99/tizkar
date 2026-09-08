@@ -53,43 +53,48 @@ export function isSafeStoragePath(filepath: string): boolean {
 /**
  * Validates the schema and completeness rules of a Snapshot Manifest.
  */
-export function validateManifestSchema(manifest: any): manifest is SnapshotManifest {
+export function validateManifestSchema(manifest: unknown): manifest is SnapshotManifest {
   if (!manifest || typeof manifest !== 'object') return false;
   
-  if (manifest.schema_version !== '1.1') return false;
-  if (!manifest.snapshot_id || typeof manifest.snapshot_id !== 'string') return false;
-  if (!manifest.source_bucket || typeof manifest.source_bucket !== 'string') return false;
-  
-  if (!manifest.started_at || isNaN(Date.parse(manifest.started_at))) return false;
-  if (!manifest.completed_at || isNaN(Date.parse(manifest.completed_at))) return false;
-  
-  if (manifest.status !== 'PREPARING' && manifest.status !== 'COMPLETE' && 
-      manifest.status !== 'FAILED' && manifest.status !== 'INCOMPLETE') return false;
-      
-  if (manifest.consistency_guarantee !== 'BEST_EFFORT' && manifest.consistency_guarantee !== 'POINT_IN_TIME') return false;
-  
-  if (typeof manifest.total_objects !== 'number' || manifest.total_objects < 0) return false;
-  if (typeof manifest.total_bytes !== 'number' || manifest.total_bytes < 0) return false;
-  
-  if (!Array.isArray(manifest.objects)) return false;
-  if (!Array.isArray(manifest.failures)) return false;
+  const m = manifest as Record<string, unknown>;
 
-  if (manifest.status === 'COMPLETE' && manifest.failures.length > 0) return false;
-  if (manifest.status === 'COMPLETE' && manifest.total_objects !== manifest.objects.length) return false;
+  if (m.schema_version !== '1.1') return false;
+  if (!m.snapshot_id || typeof m.snapshot_id !== 'string') return false;
+  if (!m.source_bucket || typeof m.source_bucket !== 'string') return false;
+  
+  if (!m.started_at || typeof m.started_at !== 'string' || isNaN(Date.parse(m.started_at))) return false;
+  if (!m.completed_at || typeof m.completed_at !== 'string' || isNaN(Date.parse(m.completed_at))) return false;
+  
+  if (m.status !== 'PREPARING' && m.status !== 'COMPLETE' && 
+      m.status !== 'FAILED' && m.status !== 'INCOMPLETE') return false;
+      
+  if (m.consistency_guarantee !== 'BEST_EFFORT' && m.consistency_guarantee !== 'POINT_IN_TIME') return false;
+  
+  if (typeof m.total_objects !== 'number' || m.total_objects < 0) return false;
+  if (typeof m.total_bytes !== 'number' || m.total_bytes < 0) return false;
+  
+  if (!Array.isArray(m.objects)) return false;
+  if (!Array.isArray(m.failures)) return false;
+
+  if (m.status === 'COMPLETE' && m.failures.length > 0) return false;
+  if (m.status === 'COMPLETE' && m.total_objects !== m.objects.length) return false;
 
   const pathSet = new Set<string>();
 
-  for (const obj of manifest.objects) {
-    if (!obj.original_path || typeof obj.original_path !== 'string' || !isSafeStoragePath(obj.original_path)) return false;
+  for (const obj of m.objects) {
+    if (!obj || typeof obj !== 'object') return false;
+    const o = obj as Record<string, unknown>;
+
+    if (!o.original_path || typeof o.original_path !== 'string' || !isSafeStoragePath(o.original_path)) return false;
     
     // Check for duplicate normalized paths (case-insensitive collision check)
-    const normalized = obj.original_path.toLowerCase();
+    const normalized = o.original_path.toLowerCase();
     if (pathSet.has(normalized)) return false;
     pathSet.add(normalized);
 
-    if (typeof obj.size !== 'number' || obj.size < 0) return false;
-    if (!obj.sha256 || typeof obj.sha256 !== 'string') return false;
-    if (!obj.content_addressed_key || typeof obj.content_addressed_key !== 'string') return false;
+    if (typeof o.size !== 'number' || o.size < 0) return false;
+    if (!o.sha256 || typeof o.sha256 !== 'string') return false;
+    if (!o.content_addressed_key || typeof o.content_addressed_key !== 'string') return false;
   }
 
   return true;
@@ -103,12 +108,13 @@ export function computeManifestIntegrity(manifest: SnapshotManifest): string {
   delete clone.manifest_integrity_sha256;
   
   // Deterministic JSON stringify: order keys alphabetically
-  const deterministicStringify = (obj: any): string => {
+  const deterministicStringify = (obj: unknown): string => {
     if (Array.isArray(obj)) {
       return '[' + obj.map(deterministicStringify).join(',') + ']';
     } else if (obj !== null && typeof obj === 'object') {
-      const keys = Object.keys(obj).sort();
-      return '{' + keys.map(k => JSON.stringify(k) + ':' + deterministicStringify(obj[k])).join(',') + '}';
+      const record = obj as Record<string, unknown>;
+      const keys = Object.keys(record).sort();
+      return '{' + keys.map(k => JSON.stringify(k) + ':' + deterministicStringify(record[k])).join(',') + '}';
     }
     return JSON.stringify(obj);
   };

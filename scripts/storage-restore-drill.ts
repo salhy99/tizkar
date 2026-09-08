@@ -119,7 +119,7 @@ async function runDrill() {
     console.log(`Total Bytes Verified: ${totalBytes}`);
     console.log(`Result: ${hasFailure ? 'FAILED' : 'PASS'}`);
 
-  } catch (err: any) {
+  } catch {
     console.error(`[RestoreDrill] FATAL Error during drill execution (details omitted for safety).`);
     hasFailure = true;
   }
