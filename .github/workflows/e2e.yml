@@ -26,7 +26,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
 
       - name: Install dependencies
@@ -56,15 +56,7 @@ jobs:
             mv supabase/migrations supabase/migrations.bak
             cp -r supabase/migrations.bak supabase/migrations
             
-            cat << 'EOF' > supabase/migrations/20260824000000_e2e_reference_seed.sql
--- DEVELOPMENT ONLY: E2E Reference Data Bootstrap
--- Injects required reference data to satisfy subsequent migrations without modifying history.
-            
-INSERT INTO event_types (id, name_ar, name_en, slug, is_active, display_order)
-VALUES 
-  ('a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d', 'زواج', 'Wedding', 'wedding', true, 1)
-ON CONFLICT (id) DO NOTHING;
-EOF
+            cp tests/e2e/helpers/e2e-reference-seed.sql supabase/migrations/20260824000000_e2e_reference_seed.sql
             # ---------------------------------
             
             npx supabase start
@@ -87,6 +79,18 @@ EOF
           else
             echo "Using configured external Supabase test environment."
           fi
+
+      - name: Runtime Diagnostic
+        run: |
+          node -e "
+            console.log('Node Version:', process.version);
+            if (typeof WebSocket !== 'undefined') {
+              console.log('Native WebSocket Support: AVAILABLE');
+            } else {
+              console.error('Native WebSocket Support: MISSING');
+              process.exit(1);
+            }
+          "
 
       - name: Seed Synthetic E2E Admin User
         run: node tests/e2e/helpers/seed-admin.mjs

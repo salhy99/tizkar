@@ -65,3 +65,39 @@ export async function cleanupTestInvitations(testPrefix: string = 'E2E-') {
     console.error('Failed to cleanup E2E invitations:', error);
   }
 }
+
+export async function createTestUser(emailPrefix: string) {
+  const adminClient = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+  
+  const email = `${emailPrefix}-${Date.now()}@tidkar.local`;
+  const password = process.env.SUPABASE_DUMMY_PASSWORD || 'tidkar-dev-pass-2026';
+  
+  const { data, error } = await adminClient.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true
+  });
+  
+  if (error) throw new Error(`Failed to create test user: ${error.message}`);
+  
+  // Create profile
+  await adminClient.from('profiles').upsert({
+    id: data.user.id,
+    display_name: 'E2E Test User'
+  });
+  
+  return data.user;
+}
+
+export async function deleteTestUser(userId: string) {
+  const adminClient = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+  
+  const { error } = await adminClient.auth.admin.deleteUser(userId);
+  if (error) console.error(`Failed to delete test user ${userId}:`, error);
+}
