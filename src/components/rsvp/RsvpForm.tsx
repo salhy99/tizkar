@@ -1,19 +1,18 @@
 'use client'
 
-import { useState, useTransition, useEffect } from 'react'
+import { useState, useTransition, useSyncExternalStore } from 'react'
 import { submitRsvp } from '@/actions/rsvps'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 
+const emptySubscribe = () => () => {}
+
 export default function RsvpForm({ invitationId }: { invitationId: string }) {
   const [isPending, startTransition] = useTransition()
   const [status, setStatus] = useState<'IDLE' | 'SUCCESS_ATTENDING' | 'SUCCESS_DECLINED'>('IDLE')
   const [error, setError] = useState('')
-  const [mounted, setMounted] = useState(false)
-  useEffect(() => {
-    setMounted(true)
-  }, [])
+  const mounted = useSyncExternalStore(emptySubscribe, () => true, () => false)
 
   // Form State
   const [name, setName] = useState('')
