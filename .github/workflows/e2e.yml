@@ -50,8 +50,29 @@ jobs:
         run: |
           if [ -z "${NEXT_PUBLIC_SUPABASE_URL}" ]; then
             echo "No external Supabase secrets configured. Starting ephemeral local Supabase stack..."
+            
+            # --- E2E Bootstrap Preparation ---
+            echo "Preparing deterministic local migration sequence..."
+            mv supabase/migrations supabase/migrations.bak
+            cp -r supabase/migrations.bak supabase/migrations
+            
+            cat << 'EOF' > supabase/migrations/20260824000000_e2e_reference_seed.sql
+-- DEVELOPMENT ONLY: E2E Reference Data Bootstrap
+-- Injects required reference data to satisfy subsequent migrations without modifying history.
+            
+INSERT INTO event_types (id, name_ar, name_en, slug, is_active, display_order)
+VALUES 
+  ('a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d', 'زواج', 'Wedding', 'wedding', true, 1)
+ON CONFLICT (id) DO NOTHING;
+EOF
+            # ---------------------------------
+            
             npx supabase start
             STATUS_JSON=$(npx supabase status -o json)
+            
+            # Cleanup injected sequence so Git remains clean
+            rm -rf supabase/migrations
+            mv supabase/migrations.bak supabase/migrations
             
             API_URL=$(echo "$STATUS_JSON" | jq -r '.API_URL')
             ANON_KEY=$(echo "$STATUS_JSON" | jq -r '.ANON_KEY')
