@@ -63,6 +63,10 @@ test.describe.serial('Security & Access Control', () => {
       // Ensure the actual editor UI (like "حفظ", "نشر", "ضيوف") is not available.
       await expect(pageA.getByRole('button', { name: 'حفظ' })).not.toBeVisible();
       await expect(pageA.getByRole('button', { name: 'نشر' })).not.toBeVisible();
+      
+      // Explicitly check that private data is not returned in HTML or DOM
+      const content = await pageA.content();
+      expect(content).not.toContain(testIdB); // B's title/data must not leak
     } else {
       // It redirected successfully away from the editor
       expect(pageA.url()).not.toBe(editorUrlB);
