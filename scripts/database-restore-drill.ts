@@ -162,7 +162,8 @@ async function runRestoreDrill() {
     // Construct minimal child process environment, absolutely excluding any production secrets
     const minimalEnv: NodeJS.ProcessEnv = {
       PATH: process.env.PATH,
-      PGPASSWORD: 'postgres' // Target DB password only (local disposable container password)
+      PGPASSWORD: 'postgres', // Target DB password only (local disposable container password)
+      NODE_ENV: 'test'
     }
 
     // Notice we use --no-owner --no-acl --exit-on-error. We omit --clean since the DB is created fresh.
