@@ -47,7 +47,7 @@ jobs:
           fi
 
       - name: Run Connectivity Preflight
-        run: node tests/e2e/preflight.js
+        run: node tests/e2e/preflight.mjs
 
       - name: Install Playwright Browsers
         run: npx playwright install chromium --with-deps
