@@ -1,5 +1,5 @@
 import * as dotenv from 'dotenv'
-import { exec } from 'child_process'
+import { execFile } from 'child_process'
 import { promisify } from 'util'
 import * as fs from 'fs'
 import * as path from 'path'
@@ -8,7 +8,7 @@ import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
 
 dotenv.config({ path: '.env.local' })
 
-const execAsync = promisify(exec)
+const execFileAsync = promisify(execFile)
 
 // Validate Env
 const requiredEnvs = [
@@ -49,8 +49,17 @@ async function runDatabaseBackup() {
     console.log(`[DB Backup] Executing pg_dump...`)
     const pgUrl = process.env.SUPABASE_DB_URL!
     
+    const pgDumpBinary = process.env.PG_DUMP_BIN || '/usr/lib/postgresql/17/bin/pg_dump'
+
     // We use the custom format (-Fc) which is compressed and suitable for pg_restore.
-    const { stdout, stderr } = await execAsync(`pg_dump -Fc --no-owner --no-acl -f "${dumpPath}" "${pgUrl}"`)
+    const { stdout, stderr } = await execFileAsync(pgDumpBinary, [
+      '-Fc',
+      '--no-owner',
+      '--no-acl',
+      '-f',
+      dumpPath,
+      pgUrl
+    ])
     
     if (stderr && !stderr.includes('warning')) {
       console.warn(`[DB Backup] pg_dump output: ${stderr}`)
