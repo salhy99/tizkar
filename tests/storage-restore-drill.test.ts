@@ -1,4 +1,3 @@
-import { after, describe, it } from 'node:test';
 import assert from 'node:assert';
 import { verifyLegacyObject, extractSha256 } from '../src/lib/storage/backup/snapshot/drill-verifier';
 import { S3Client, HeadObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
@@ -32,7 +31,7 @@ describe('Legacy Mirror Restore Drill Verifier', () => {
   }
 
   // Ensure cleanup after tests
-  after(() => {
+  afterAll(() => {
     if (existsSync(TEST_DIR)) {
       rmSync(TEST_DIR, { recursive: true, force: true });
     }

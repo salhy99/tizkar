@@ -2,7 +2,6 @@ import { isSafeStoragePath, validateManifestSchema, computeManifestIntegrity } f
 import { SnapshotManifest } from '../src/lib/storage/backup/snapshot/types';
 import { computeStreamHash } from '../src/lib/storage/backup/snapshot/hasher';
 import { Readable } from 'stream';
-import { describe, it } from 'node:test';
 import assert from 'node:assert';
 
 describe('Storage Snapshot Path Validation', () => {
