@@ -65,7 +65,7 @@ describe('Snapshot Manifest Validation', () => {
       {
         original_path: 'user/file.jpg',
         size: 1024,
-        mime_type: 'image/jpeg',
+        content_type: 'image/jpeg',
         sha256: 'deadbeef',
         content_addressed_key: 'objects/deadbeef'
       }
@@ -80,7 +80,7 @@ describe('Snapshot Manifest Validation', () => {
 
   it('rejects incomplete snapshot labeled as COMPLETE', () => {
     const manifest = getValidManifest();
-    manifest.failures.push({ original_path: 'a.jpg', error: 'e', stage: 'download' });
+    manifest.failures.push({ snapshot_id: '1', error_code: 'SOURCE_DOWNLOAD_FAILED', failed_at: '2026-01-01' });
     assert.strictEqual(validateManifestSchema(manifest), false);
   });
 
@@ -97,7 +97,7 @@ describe('Snapshot Manifest Validation', () => {
     manifest.objects.push({
       original_path: 'USER/file.jpg', // Case-folding collision with 'user/file.jpg'
       size: 1024,
-      mime_type: 'image/jpeg',
+      content_type: 'image/jpeg',
       sha256: 'deadbeef2',
       content_addressed_key: 'objects/deadbeef2'
     });

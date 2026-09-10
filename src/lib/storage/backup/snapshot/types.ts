@@ -1,34 +1,60 @@
-export interface SnapshotManifest {
-  snapshot_id: string; // e.g., snap-YYYYMMDD-HHMMSS
-  schema_version: '1.1';
-  source_bucket: string;
-  started_at: string; // ISO8601
-  completed_at: string; // ISO8601
-  status: 'PREPARING' | 'COMPLETE' | 'FAILED' | 'INCOMPLETE';
-  consistency_guarantee: 'BEST_EFFORT' | 'POINT_IN_TIME';
-  total_objects: number;
-  total_bytes: number;
-  objects: SnapshotObject[];
-  failures: SnapshotFailure[];
-  manifest_integrity_sha256?: string; // Deterministic hash of the manifest without this field
+export type SnapshotStatus = 'PREPARING' | 'COMPLETE' | 'FAILED' | 'INCOMPLETE';
+
+export interface SnapshotObjectEntry {
+  original_path: string;
+  content_addressed_key: string;
+  sha256: string;
+  size: number;
+  content_type?: string;
+  source_bucket?: string;
+  discovered_at?: string;
+  source_updated_at?: string;
+  source_etag?: string;
 }
 
-export interface SnapshotObject {
-  original_path: string; // Relative path in the source bucket
-  content_addressed_key: string; // Immutable key based on SHA-256 (e.g., objects/<sha256>)
-  size: number;
-  mime_type: string;
-  sha256: string; // Cryptographic hash of object contents
+export interface SnapshotManifest {
+  schema_version: string;
+  snapshot_id: string;
+  status: SnapshotStatus;
+  started_at: string;
+  completed_at?: string;
+  source_bucket: string;
+  consistency_guarantee: string;
+  total_objects: number;
+  total_bytes: number;
+  objects: SnapshotObjectEntry[];
+  failures: SnapshotFailure[];
+}
+
+export interface SnapshotMetadata {
+  snapshot_id: string;
+  state: SnapshotStatus;
+  manifest_sha256?: string;
+  total_objects: number;
+  total_bytes: number;
+  started_at: string;
+  completed_at?: string;
 }
 
 export interface SnapshotFailure {
-  original_path: string;
-  error: string;
-  stage: 'listing' | 'download' | 'upload' | 'validation';
+  snapshot_id: string;
+  error_code: string;
+  message?: string;
+  failed_at: string;
 }
 
-export interface SnapshotStateContext {
-  required_objects: Map<string, { size: number, etag?: string }>;
-  verified_objects: Set<string>;
-  failed_objects: Set<string>;
-}
+// Error codes based on Phase K
+export type SnapshotErrorCode =
+  | 'SOURCE_LIST_FAILED'
+  | 'SOURCE_DOWNLOAD_FAILED'
+  | 'SOURCE_CHANGED_DURING_COPY'
+  | 'SOURCE_OBJECT_INVALID'
+  | 'DESTINATION_HEAD_FAILED'
+  | 'DESTINATION_UPLOAD_FAILED'
+  | 'DESTINATION_HASH_CONFLICT'
+  | 'MANIFEST_GENERATION_FAILED'
+  | 'MANIFEST_UPLOAD_FAILED'
+  | 'MANIFEST_HASH_MISMATCH'
+  | 'STATUS_PUBLISH_FAILED'
+  | 'SNAPSHOT_INCOMPLETE'
+  | 'CLEANUP_FAILED';
