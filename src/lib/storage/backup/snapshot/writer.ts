@@ -18,6 +18,12 @@ export class ContentAddressedWriter {
   ) {}
 
   async processObject(sourceObj: BackupObject, maxRetries = 3): Promise<WriterResult> {
+    const MAX_OBJECT_BYTES = 50 * 1024 * 1024; // 50MB hard limit for memory buffering
+
+    if (sourceObj.size > MAX_OBJECT_BYTES) {
+      return { object_key: '', sha256: '', size: sourceObj.size, status: 'FAILED', error_code: 'OVERSIZED_OBJECT_FAILS_CLOSED' };
+    }
+
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         const data = await this.sourceAdapter.getObject(sourceObj.key);
@@ -25,10 +31,29 @@ export class ContentAddressedWriter {
           return { object_key: '', sha256: '', size: 0, status: 'FAILED', error_code: 'SOURCE_DOWNLOAD_FAILED' };
         }
 
-        // Pre-check size
-        if (data.size !== sourceObj.size) {
-           if (attempt === maxRetries) return { object_key: '', sha256: '', size: data.size, status: 'FAILED', error_code: 'SOURCE_CHANGED_DURING_COPY' };
-           continue; // Retry
+        // Post-download verification: get fresh metadata
+        if (this.sourceAdapter.getObjectMetadata) {
+          const freshMeta = await this.sourceAdapter.getObjectMetadata(sourceObj.key);
+          if (!freshMeta) {
+             if (attempt === maxRetries) return { object_key: '', sha256: '', size: data.size, status: 'FAILED', error_code: 'SOURCE_CHANGED_DURING_COPY' };
+             continue;
+          }
+          if (
+            freshMeta.size !== sourceObj.size ||
+            freshMeta.updated_at !== sourceObj.updated_at ||
+            freshMeta.etag !== sourceObj.etag
+          ) {
+             if (attempt === maxRetries) return { object_key: '', sha256: '', size: data.size, status: 'FAILED', error_code: 'SOURCE_CHANGED_DURING_COPY' };
+             // Update our understanding of the object and retry
+             sourceObj = freshMeta;
+             continue; 
+          }
+        } else {
+          // Fallback pre-check if metadata fetch isn't supported
+          if (data.size !== sourceObj.size) {
+             if (attempt === maxRetries) return { object_key: '', sha256: '', size: data.size, status: 'FAILED', error_code: 'SOURCE_CHANGED_DURING_COPY' };
+             continue; // Retry
+          }
         }
 
         const buffer = Buffer.from(await data.arrayBuffer());

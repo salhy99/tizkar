@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
 import { StorageSourceAdapter } from '../interfaces';
 import { ContentAddressedWriter } from './writer';
 import { generateSnapshotId } from './id';
@@ -18,8 +18,23 @@ export class SnapshotOrchestrator {
   }
 
   async runSnapshot(prefix: string = ''): Promise<SnapshotMetadata> {
-    const snapshotId = generateSnapshotId();
     const startTime = new Date().toISOString();
+    const snapshotId = generateSnapshotId();
+
+    // Enforce snapshot ID non-reuse explicitly
+    try {
+       await this.s3Client.send(new HeadObjectCommand({ Bucket: this.destinationBucket, Key: `snapshots/${snapshotId}/status.json` }));
+       throw new Error(`SNAPSHOT_ID_COLLISION: Status already exists for ${snapshotId}`);
+    } catch (err: any) {
+       if (err.name !== 'NotFound' && err.name !== 'NoSuchKey') throw err;
+    }
+
+    try {
+       await this.s3Client.send(new HeadObjectCommand({ Bucket: this.destinationBucket, Key: `snapshots/${snapshotId}/manifest.json` }));
+       throw new Error(`SNAPSHOT_ID_COLLISION: Manifest already exists for ${snapshotId}`);
+    } catch (err: any) {
+       if (err.name !== 'NotFound' && err.name !== 'NoSuchKey') throw err;
+    }
 
     // 1. Write PREPARING status
     await this.uploadStatus(snapshotId, 'PREPARING', 0, 0, startTime);

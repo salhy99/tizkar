@@ -68,4 +68,28 @@ export class SupabaseStorageSource implements StorageSourceAdapter {
     }
     return data;
   }
+  async getObjectMetadata(key: string): Promise<BackupObject | null> {
+    const parts = key.split('/');
+    const filename = parts.pop() || '';
+    const folder = parts.join('/');
+    
+    const { data, error } = await this.supabase.storage.from(this.bucketName).list(folder, {
+      limit: 1,
+      search: filename
+    });
+
+    if (error || !data || data.length === 0) return null;
+
+    const item = data.find(d => d.name === filename);
+    if (!item || !item.id) return null;
+
+    return {
+      key,
+      size: item.metadata?.size || 0,
+      mime: item.metadata?.mimetype || 'application/octet-stream',
+      created_at: item.created_at || new Date().toISOString(),
+      updated_at: item.updated_at || new Date().toISOString(),
+      etag: item.metadata?.eTag?.replace(/"/g, '') || undefined,
+    };
+  }
 }

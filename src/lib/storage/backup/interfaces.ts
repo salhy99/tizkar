@@ -11,6 +11,7 @@ export interface BackupObject {
 export interface StorageSourceAdapter {
   listObjects(prefix?: string, limit?: number, offset?: number): Promise<BackupObject[]>;
   getObject(key: string): Promise<Blob | null>;
+  getObjectMetadata?(key: string): Promise<BackupObject | null>;
 }
 
 export interface StorageDestinationAdapter {
