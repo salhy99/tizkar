@@ -119,8 +119,26 @@ async function runDrill() {
     console.log(`Total Bytes Verified: ${totalBytes}`);
     console.log(`Result: ${hasFailure ? 'FAILED' : 'PASS'}`);
 
-  } catch {
-    console.error(`[RestoreDrill] FATAL Error during drill execution (details omitted for safety).`);
+  } catch (err: unknown) {
+    let safeCode = 'UNKNOWN_SAFE_FAILURE';
+    if (err instanceof Error) {
+      const name = err.name || (err as { Code?: string }).Code || (err as { code?: string }).code;
+      if (name === 'AccessDenied' || name === 'SignatureDoesNotMatch' || name === 'InvalidAccessKeyId') {
+        safeCode = 'R2_ACCESS_DENIED';
+      } else if (name === 'NoSuchBucket') {
+        safeCode = 'R2_BUCKET_NOT_FOUND';
+      } else if (name === 'TimeoutError' || name === 'ECONNREFUSED' || name === 'ENOTFOUND' || err.message?.includes('fetch') || name === 'TypeError') {
+        safeCode = 'R2_CLIENT_INIT_FAILED';
+      } else if (name === 'ListObjectsV2Error' || name === 'ListObjectsV2Command') {
+        safeCode = 'R2_LIST_FAILED';
+      } else if (name) {
+        safeCode = `R2_LIST_FAILED_${name}`;
+      }
+    } else if (typeof err === 'object' && err !== null) {
+      const name = (err as { name?: string }).name || (err as { Code?: string }).Code || (err as { code?: string }).code;
+      if (name) safeCode = `R2_LIST_FAILED_${name}`;
+    }
+    console.error(`[RestoreDrill] FATAL Error: ${safeCode} (details omitted for safety).`);
     hasFailure = true;
   }
 
