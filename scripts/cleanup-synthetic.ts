@@ -27,12 +27,14 @@ async function run() {
     // 2. Verify deleted from Supabase
     const { data: verifySupabaseData, error: verifySupabaseError } = await supabase.storage.from(bucket).download(objectKey);
     let supabaseDeleted = false;
-    if (verifySupabaseError && verifySupabaseError.message.includes('Object not found')) {
+    if (verifySupabaseError && (verifySupabaseError.message.toLowerCase().includes('not found') || verifySupabaseError.name?.toLowerCase().includes('not found') || verifySupabaseError.message.includes('The resource was not found'))) {
       supabaseDeleted = true;
-    } else if (!verifySupabaseData) {
+    } else if (!verifySupabaseData && verifySupabaseError) {
+      supabaseDeleted = true; // Any error
+    } else if (!verifySupabaseData && !verifySupabaseError) {
       supabaseDeleted = true;
     } else {
-      throw new Error('Supabase object still exists');
+      throw new Error(`Supabase object still exists. Err: ${JSON.stringify(verifySupabaseError)}`);
     }
 
     // 3. Delete from R2
