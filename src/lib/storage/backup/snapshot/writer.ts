@@ -18,7 +18,8 @@ export class ContentAddressedWriter {
   ) {}
 
   async processObject(sourceObj: BackupObject, maxRetries = 3): Promise<WriterResult> {
-    const MAX_OBJECT_BYTES = 50 * 1024 * 1024; // 50MB hard limit for memory buffering
+    // Aligned with src/actions/storage.ts CATEGORY_SIZE_LIMITS (Max audio is 10MB)
+    const MAX_OBJECT_BYTES = 10 * 1024 * 1024; 
 
     if (sourceObj.size > MAX_OBJECT_BYTES) {
       return { object_key: '', sha256: '', size: sourceObj.size, status: 'FAILED', error_code: 'OVERSIZED_OBJECT_FAILS_CLOSED' };

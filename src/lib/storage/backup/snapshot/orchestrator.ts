@@ -36,6 +36,13 @@ export class SnapshotOrchestrator {
        if (err.name !== 'NotFound' && err.name !== 'NoSuchKey') throw err;
     }
 
+    try {
+       await this.s3Client.send(new HeadObjectCommand({ Bucket: this.destinationBucket, Key: `snapshots/${snapshotId}/manifest.sha256` }));
+       throw new Error(`SNAPSHOT_ID_COLLISION: Manifest SHA already exists for ${snapshotId}`);
+    } catch (err: any) {
+       if (err.name !== 'NotFound' && err.name !== 'NoSuchKey') throw err;
+    }
+
     // 1. Write PREPARING status
     await this.uploadStatus(snapshotId, 'PREPARING', 0, 0, startTime);
 
