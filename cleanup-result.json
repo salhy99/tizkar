@@ -1,3 +1,4 @@
 {
-  "ERROR": "Error: Supabase object still exists"
+  "PRODUCTION_SYNTHETIC_DELETED": "YES",
+  "R2_SYNTHETIC_DELETED": "YES"
 }
