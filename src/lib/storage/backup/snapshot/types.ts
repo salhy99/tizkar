@@ -23,7 +23,7 @@ export interface SnapshotManifest {
   total_objects: number;
   total_bytes: number;
   objects: SnapshotObjectEntry[];
-  failures: any[];
+  failures: SnapshotFailure[];
 }
 
 export interface SnapshotMetadata {

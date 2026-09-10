@@ -1,5 +1,5 @@
 import { S3Client, GetObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
-import { SnapshotManifest, SnapshotMetadata, SnapshotStatus } from './types';
+import { SnapshotManifest, SnapshotMetadata } from './types';
 import crypto from 'crypto';
 import path from 'path';
 import { createWriteStream, createReadStream, promises as fsPromises } from 'fs';
@@ -117,9 +117,10 @@ export class SnapshotRestoreVerifier {
 
       return { snapshot_id: snapshotId, status: 'PASS', objects_verified: objectsVerified, bytes_verified: bytesVerified };
 
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(`[SnapshotRestoreVerifier] Error:`, err);
-      return { snapshot_id: snapshotId, status: 'FAILED', objects_verified: 0, bytes_verified: 0, reason: err.message };
+      const msg = err instanceof Error ? err.message : String(err);
+      return { snapshot_id: snapshotId, status: 'FAILED', objects_verified: 0, bytes_verified: 0, reason: msg };
     }
   }
 }

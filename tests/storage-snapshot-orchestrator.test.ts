@@ -8,7 +8,7 @@ describe('SnapshotOrchestrator', () => {
   let mockS3Client: S3Client;
   let mockSourceAdapter: StorageSourceAdapter;
   let orchestrator: SnapshotOrchestrator;
-  let s3Commands: any[] = [];
+  let s3Commands: unknown[] = [];
 
   beforeEach(() => {
     s3Commands = [];

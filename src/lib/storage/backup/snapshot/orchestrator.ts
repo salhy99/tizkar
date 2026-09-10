@@ -25,22 +25,25 @@ export class SnapshotOrchestrator {
     try {
        await this.s3Client.send(new HeadObjectCommand({ Bucket: this.destinationBucket, Key: `snapshots/${snapshotId}/status.json` }));
        throw new Error(`SNAPSHOT_ID_COLLISION: Status already exists for ${snapshotId}`);
-    } catch (err: any) {
-       if (err.name !== 'NotFound' && err.name !== 'NoSuchKey') throw err;
+    } catch (err: unknown) {
+       const isS3NotFound = err instanceof Error && (err.name === 'NotFound' || err.name === 'NoSuchKey');
+       if (!isS3NotFound) throw err;
     }
 
     try {
        await this.s3Client.send(new HeadObjectCommand({ Bucket: this.destinationBucket, Key: `snapshots/${snapshotId}/manifest.json` }));
        throw new Error(`SNAPSHOT_ID_COLLISION: Manifest already exists for ${snapshotId}`);
-    } catch (err: any) {
-       if (err.name !== 'NotFound' && err.name !== 'NoSuchKey') throw err;
+    } catch (err: unknown) {
+       const isS3NotFound = err instanceof Error && (err.name === 'NotFound' || err.name === 'NoSuchKey');
+       if (!isS3NotFound) throw err;
     }
 
     try {
        await this.s3Client.send(new HeadObjectCommand({ Bucket: this.destinationBucket, Key: `snapshots/${snapshotId}/manifest.sha256` }));
        throw new Error(`SNAPSHOT_ID_COLLISION: Manifest SHA already exists for ${snapshotId}`);
-    } catch (err: any) {
-       if (err.name !== 'NotFound' && err.name !== 'NoSuchKey') throw err;
+    } catch (err: unknown) {
+       const isS3NotFound = err instanceof Error && (err.name === 'NotFound' || err.name === 'NoSuchKey');
+       if (!isS3NotFound) throw err;
     }
 
     // 1. Write PREPARING status
@@ -136,7 +139,7 @@ export class SnapshotOrchestrator {
       const metadata = await this.uploadStatus(snapshotId, 'COMPLETE', entries.length, totalBytes, startTime, manifestSha256);
       return metadata;
 
-    } catch (err: any) {
+    } catch (err: unknown) {
       await this.uploadStatus(snapshotId, 'FAILED', 0, 0, startTime);
       throw err;
     }

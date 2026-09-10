@@ -80,7 +80,7 @@ describe('Snapshot Manifest Validation', () => {
 
   it('rejects incomplete snapshot labeled as COMPLETE', () => {
     const manifest = getValidManifest();
-    manifest.failures.push({ original_path: 'a.jpg', error: 'e', stage: 'download' });
+    manifest.failures.push({ snapshot_id: '1', error_code: 'SOURCE_DOWNLOAD_FAILED', failed_at: '2026-01-01' });
     assert.strictEqual(validateManifestSchema(manifest), false);
   });
 

@@ -76,8 +76,9 @@ export class ContentAddressedWriter {
 
           // Integrity matches, no upload needed
           return { object_key: contentKey, sha256: hash, size: data.size, status: 'DEDUPLICATED' };
-        } catch (err: any) {
-          if (err.name !== 'NotFound' && err.name !== 'NoSuchKey') {
+        } catch (err: unknown) {
+          const isS3NotFound = err instanceof Error && (err.name === 'NotFound' || err.name === 'NoSuchKey');
+          if (!isS3NotFound) {
              return { object_key: contentKey, sha256: hash, size: data.size, status: 'FAILED', error_code: 'DESTINATION_HEAD_FAILED' };
           }
         }

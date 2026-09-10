@@ -43,9 +43,10 @@ async function runSnapshot() {
     console.log(`OBJECTS_DISCOVERED: ${result.total_objects}`);
     console.log(`TOTAL_BYTES_LOGICAL: ${result.total_bytes}`);
     console.log(`MANIFEST_SHA256: ${result.manifest_sha256}`);
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('\n=== SNAPSHOT FAILED ===');
-    console.error(err.message || String(err));
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(msg);
     process.exit(1);
   }
 }

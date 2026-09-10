@@ -40,7 +40,11 @@ describe('Storage Snapshot Architecture Coverage', () => {
   it('13. destination upload failure', async () => {
      const mockS3 = {
        send: vi.fn().mockImplementation(async (cmd) => {
-         if (cmd instanceof HeadObjectCommand) throw { name: 'NotFound' };
+         if (cmd.constructor.name === 'HeadObjectCommand') {
+             const err = new Error('NotFound');
+             err.name = 'NotFound';
+             throw err;
+         }
          if (cmd instanceof PutObjectCommand) throw new Error('Upload failed');
        })
      } as unknown as S3Client;
@@ -108,8 +112,10 @@ describe('Storage Snapshot Architecture Coverage', () => {
   it('33. ID collision: only status exists', async () => {
      const mockS3 = {
        send: vi.fn().mockImplementation(async (cmd) => {
-         if (cmd.input.Key.includes('status.json')) return {}; // Exists
-         throw { name: 'NotFound' };
+         if (cmd.input && cmd.input.Key && cmd.input.Key.includes('status.json')) return {}; // Exists
+         const err = new Error('NotFound');
+         err.name = 'NotFound';
+         throw err;
        })
      } as unknown as S3Client;
      const orchestrator = new SnapshotOrchestrator(mockS3, {} as StorageSourceAdapter, 'dest', 'src');
@@ -118,8 +124,10 @@ describe('Storage Snapshot Architecture Coverage', () => {
   it('34. ID collision: only manifest exists', async () => {
      const mockS3 = {
        send: vi.fn().mockImplementation(async (cmd) => {
-         if (cmd.input.Key.includes('manifest.json')) return {}; // Exists
-         throw { name: 'NotFound' };
+         if (cmd.input && cmd.input.Key && cmd.input.Key.includes('manifest.json')) return {}; // Exists
+         const err = new Error('NotFound');
+         err.name = 'NotFound';
+         throw err;
        })
      } as unknown as S3Client;
      const orchestrator = new SnapshotOrchestrator(mockS3, {} as StorageSourceAdapter, 'dest', 'src');
@@ -128,8 +136,10 @@ describe('Storage Snapshot Architecture Coverage', () => {
   it('35. ID collision: only manifest.sha256 exists', async () => {
      const mockS3 = {
        send: vi.fn().mockImplementation(async (cmd) => {
-         if (cmd.input.Key.includes('manifest.sha256')) return {}; // Exists
-         throw { name: 'NotFound' };
+         if (cmd.input && cmd.input.Key && cmd.input.Key.includes('manifest.sha256')) return {}; // Exists
+         const err = new Error('NotFound');
+         err.name = 'NotFound';
+         throw err;
        })
      } as unknown as S3Client;
      const orchestrator = new SnapshotOrchestrator(mockS3, {} as StorageSourceAdapter, 'dest', 'src');

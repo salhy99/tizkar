@@ -31,7 +31,7 @@ describe('SupabaseStorageSource', () => {
   });
 
   it('should list recursive folders without infinite loops', async () => {
-    const mockList = vi.fn().mockImplementation((prefix, options) => {
+    const mockList = vi.fn().mockImplementation((prefix) => {
       if (prefix === '') {
         return Promise.resolve({
           data: [{ id: null, name: 'folder1' }, { id: '1', name: 'file1.txt' }],
