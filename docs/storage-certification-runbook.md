@@ -1,53 +1,40 @@
-# Tizkar Storage Snapshot Certification Runbook
+# Storage Certification Runbook
 
-## Phase V: First Real Snapshot Certification Plan
+## Overview
+This runbook details the procedures for executing and verifying storage snapshots and restoration drills within the TIZKAR production environment. It ensures compliance with disaster recovery protocols and safe handling of production data.
 
-This document outlines the operational steps required to certify the production deployment of the Immutable Storage Snapshot architecture. **DO NOT** declare certification until all steps are successfully executed in the production environment by an authorized operator.
+## Phase 1: Snapshot Generation & Validation
+1. **Trigger Snapshot**:
+   - The scheduled backup runs daily at `01:00 UTC` via GitHub Actions (`Production Storage Snapshot`).
+   - Manual triggers must use `workflow_dispatch`. `ALLOW_EMPTY_SOURCE` must remain `false` unless explicitly diagnosing an empty bucket.
+2. **Verify Output**:
+   - The workflow emits a health summary.
+   - Assert `STATE` is `COMPLETE`.
+   - Assert `OBJECTS_DISCOVERED` > 0 (unless specifically overriding empty sources).
+   - Record the `SNAPSHOT_ID` and `MANIFEST_SHA256` for audit.
 
-### Prerequisites
-- Code merged to `main` and deployed.
-- Access to GitHub Actions (`production` environment).
-- Access to Cloudflare R2 dashboard (optional, for manual verification).
+## Phase 2: Read-Only Restore Drill (Monthly)
+*Restore drills should be executed on a Monthly cadence using restricted read-only credentials.*
 
-### Execution Sequence
+1. **Prerequisites**:
+   - Identify the `SNAPSHOT_ID` from the latest successful backup.
+   - Use the `restore-drill` environment.
+   - Ensure credentials injected are strictly `RESTORE_S3_ACCESS_KEY_ID` (Read-Only). No `NEXT_PUBLIC_SUPABASE_URL` or production DB credentials should be present.
+2. **Execute Drill**:
+   - Run `npx tsx scripts/storage-restore-drill.ts`.
+   - The drill will automatically select bounded synthetic/test samples (max 5 objects, 25MB total).
+   - If no synthetic objects exist, the drill will safely abort.
+3. **Verify Integrity**:
+   - Confirm `RESTORE_HASH_MISMATCHES: 0`.
+   - Confirm `RESTORE_SIZE_MISMATCHES: 0`.
+   - Ensure the temporary download directory `.storage_restore` is successfully cleaned up (`RESTORE_CLEANUP_RESULT: PASS`).
 
-#### 1. Execute Production Storage Snapshot
-1. Navigate to **GitHub Actions**.
-2. Select the **Production Storage Snapshot** workflow.
-3. Click **Run workflow** (ensure the branch is `main`).
-4. Monitor the execution logs. Wait for completion.
+## Phase 3: Immutability Verification
+- TIZKAR employs `APPLICATION_ENFORCED_IMMUTABILITY`.
+- Storage backup credentials are intentionally scoped without `s3:DeleteObject` permissions for the primary snapshot archive.
+- Ensure that the retention garbage collection runs via a separate, highly privileged IAM user, not the backup orchestrator.
 
-#### 2. Capture and Verify Snapshot Metadata
-1. Upon successful workflow completion, open the **Execute Snapshot** step logs.
-2. Locate the `=== SNAPSHOT SUMMARY ===` section.
-3. Note down the exact `SNAPSHOT_ID`.
-4. Verify the following output fields:
-   - `STATE`: Must be `COMPLETE`.
-   - `OBJECTS_DISCOVERED`: Should be > 0.
-   - `TOTAL_BYTES_LOGICAL`: Should be > 0.
-   - `MANIFEST_SHA256`: Must be populated.
-
-#### 3. Execute Read-Only Restore Drill
-1. Navigate back to **GitHub Actions**.
-2. Select the **Production Storage Restore Drill** workflow.
-3. Click **Run workflow** (ensure the branch is `main`).
-   *(Note: Ensure the restore drill script is updated to accept a Snapshot ID, or manually pass it as a workflow input).*
-4. Monitor the execution logs.
-
-#### 4. Verify Drill Results
-1. Open the **Execute Drill** step logs.
-2. Verify that the drill explicitly selected the verified synthetic sample (`synthetic/restore-drill-v1/sample.png`).
-3. Confirm that **NO** customer media was downloaded or verified during this automated drill.
-4. Verify the output states:
-   - `PASS`: Verified 68 bytes.
-   - `Hash`: `431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460`
-5. Verify that the disposable `.storage_restore` directory was successfully cleaned up.
-
-#### 5. Record Certification Evidence
-1. Save the GitHub Action run URLs for both the Snapshot and Restore workflows.
-2. Record the `SNAPSHOT_ID` and `MANIFEST_SHA256` in the internal compliance tracker.
-3. Update the architecture status to `SNAPSHOT_RESTORE_VERIFIED`.
-
----
-**CRITICAL WARNING:**
-Do not execute a full source-bucket restore into Production. The system is currently certified for `BEST_EFFORT_MIRROR_RECOVERY` bounded to synthetic files. Full DR certification requires separate end-to-end database and application state recovery validation.
+## Alerting and Incident Response
+- Any failure in the snapshot workflow triggers an immediate alert via GitHub Actions.
+- Incomplete snapshots will not overwrite existing valid snapshots due to content-addressed UUID tracking and unique Snapshot IDs.
+- In case of silent empty snapshots, the `Fail Closed` guard will intentionally fail the workflow, requiring SRE intervention.
