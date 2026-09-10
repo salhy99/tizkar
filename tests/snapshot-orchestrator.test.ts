@@ -5,8 +5,8 @@ import assert from 'node:assert';
 
 describe('SnapshotOrchestrator Empty Snapshot Guard', () => {
   const dummyS3Client = { 
-    send: async (cmd: any) => {
-      if (cmd.constructor.name === 'HeadObjectCommand') {
+    send: async (cmd: unknown) => {
+      if ((cmd as { constructor: { name: string } }).constructor.name === 'HeadObjectCommand') {
         const err = new Error('Not found');
         err.name = 'NotFound';
         throw err;
@@ -38,7 +38,7 @@ describe('SnapshotOrchestrator Empty Snapshot Guard', () => {
   it('fails closed when production + 0 objects + no override', async () => {
     const orchestrator = new SnapshotOrchestrator(dummyS3Client, createMockAdapter(0), 'dest', 'source', { environment: 'production', allowEmptySource: false });
 
-    orchestrator['writer']['processObject'] = async () => ({ status: 'SUCCESS', object_key: 'x', sha256: 'x', size: 10 }); // Stub writer
+    orchestrator['writer']['processObject'] = async () => ({ status: 'UPLOADED', object_key: 'objects/x', sha256: 'x', size: 10 }); // Stub writer
     
     await assert.rejects(
       orchestrator.runSnapshot(),
@@ -77,7 +77,7 @@ describe('SnapshotOrchestrator Empty Snapshot Guard', () => {
   it('completes when production + 1 object', async () => {
     const orchestrator = new SnapshotOrchestrator(dummyS3Client, createMockAdapter(1), 'dest', 'source', { environment: 'production', allowEmptySource: false });
 
-    orchestrator['writer']['processObject'] = async () => ({ status: 'SUCCESS', object_key: 'objects/x', sha256: 'x', size: 10 }); // Stub writer
+    orchestrator['writer']['processObject'] = async () => ({ status: 'UPLOADED', object_key: 'objects/x', sha256: 'x', size: 10 }); // Stub writer
     
     const result = await orchestrator.runSnapshot();
     assert.strictEqual(result.total_objects, 1);

@@ -1,28 +1,23 @@
-# Tizkar Storage Snapshot Retention & Garbage Collection Design
+# Storage Retention Design
 
 ## Objective
-To define a retention policy that preserves recent and historical points-in-time while safely removing unreferenced content-addressed objects to manage storage costs.
+Define a robust, conservative retention policy for TIZKAR's production storage backups (snapshots) in Cloudflare R2 to optimize costs while ensuring compliance and disaster recovery capabilities.
 
-## Retention Policy Requirements
-1. **Snapshots**:
-   - Keep daily snapshots for the last 30 days.
-   - Keep weekly snapshots for the last 12 weeks.
-   - Keep monthly snapshots indefinitely or for an extended period.
-2. **Content-Addressed Objects (`objects/<sha256>`)**:
-   - An object must be retained if it is referenced by **any** retained snapshot manifest.
-   - An object can only be deleted if it is not referenced by any retained manifest.
+## Policy Configuration
+- **Daily Snapshots**: Keep for **30 days**. Provides granular point-in-time recovery for recent events.
+- **Weekly Snapshots**: Keep for **12 weeks**. One representative snapshot per week is preserved for medium-term recovery.
+- **Monthly Snapshots**: Keep for **12 months**. One representative snapshot per month is preserved for long-term auditing and compliance.
 
-## Garbage Collection Algorithm (Dry-Run First)
-Garbage collection (GC) should follow a multi-phase verification process:
-1. **Identify Retained Manifests**: Enumerate all `status.json` and `manifest.json` files that match the retention criteria.
-2. **Build Referenced Set**: Parse all retained `manifest.json` files to extract a Set of `sha256` keys representing all actively used objects.
-3. **Enumerate Object Store**: List all keys under the `objects/` prefix in the R2 bucket.
-4. **Identify Orphans**: Any object under `objects/` that is not present in the Referenced Set is considered an orphan.
-5. **Grace Period**: Filter out orphaned objects created within the last 7 days to protect ongoing snapshots or delayed operations.
-6. **Execution (Dry-Run)**: By default, the GC script only logs orphaned objects.
-7. **Deletion**: Upon operator approval, the script issues `DeleteObjects` commands for the orphaned objects.
+## Implementation Details
+1. **Categorization Mechanism**:
+   - The retention script parses the `started_at` timestamp of all `COMPLETE` snapshots.
+   - It identifies the most recent snapshot for each day, week, and month.
+   - Snapshots falling outside these representative slots or exceeding the maximum age limits are marked as `EXPIRED`.
+   - `FAILED` or incomplete snapshots are not retained for the long term and are marked for immediate deletion.
+2. **Dry-Run Default**:
+   - The system is currently in **DRY-RUN** mode. The retention script classifies snapshots and logs the actions (`RETAIN` or `DELETE`) without performing any destructive operations on R2.
+3. **Immutability**:
+   - The retention system enforces `APPLICATION_ENFORCED_IMMUTABILITY`. Currently, no cloud-provider-level locks (e.g., R2 Object Lock) are active. The backup credentials only possess write access and no delete permissions on production data paths.
 
-## Important Safeguards
-- **Never delete if manifest parsing fails**: If any manifest fails to download or parse, abort GC.
-- **Atomic operations**: Do not delete a snapshot manifest until its retention period expires.
-- **Failed Snapshots**: `FAILED` or `INCOMPLETE` snapshots older than 7 days should be purged, including their orphaned objects.
+## Future Scope (Garbage Collection)
+Once the retention classification is verified over a sufficient operational period, Garbage Collection (GC) will be enabled in a separate certification phase. GC will involve a separate IAM credential restricted strictly to deleting objects marked `EXPIRED`.

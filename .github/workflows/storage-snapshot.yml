@@ -1,6 +1,8 @@
 name: Production Storage Snapshot
 
 on:
+  schedule:
+    - cron: '0 1 * * *'
   workflow_dispatch:
     inputs:
       ALLOW_EMPTY_SOURCE:
