@@ -65,7 +65,7 @@ describe('Snapshot Manifest Validation', () => {
       {
         original_path: 'user/file.jpg',
         size: 1024,
-        mime_type: 'image/jpeg',
+        content_type: 'image/jpeg',
         sha256: 'deadbeef',
         content_addressed_key: 'objects/deadbeef'
       }
@@ -97,7 +97,7 @@ describe('Snapshot Manifest Validation', () => {
     manifest.objects.push({
       original_path: 'USER/file.jpg', // Case-folding collision with 'user/file.jpg'
       size: 1024,
-      mime_type: 'image/jpeg',
+      content_type: 'image/jpeg',
       sha256: 'deadbeef2',
       content_addressed_key: 'objects/deadbeef2'
     });

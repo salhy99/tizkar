@@ -104,7 +104,7 @@ export function validateManifestSchema(manifest: unknown): manifest is SnapshotM
  * Deterministically serializes a manifest to compute its canonical SHA-256 integrity hash.
  */
 export function computeManifestIntegrity(manifest: SnapshotManifest): string {
-  const clone = { ...manifest };
+  const clone: Record<string, unknown> = { ...(manifest as unknown as Record<string, unknown>) };
   delete clone.manifest_integrity_sha256;
   
   // Deterministic JSON stringify: order keys alphabetically
