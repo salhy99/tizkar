@@ -11,6 +11,9 @@ async function runSnapshot() {
   const s3AccessKeyId = process.env.BACKUP_S3_ACCESS_KEY_ID;
   const s3SecretAccessKey = process.env.BACKUP_S3_SECRET_ACCESS_KEY;
   const s3Bucket = process.env.BACKUP_S3_BUCKET;
+  const allowEmptySource = process.env.ALLOW_EMPTY_SOURCE === 'true';
+  // Check typical env vars for environment
+  const environment = process.env.VERCEL_ENV || process.env.NODE_ENV || (process.env.GITHUB_REF_NAME === 'main' ? 'production' : 'development');
 
   if (!supabaseUrl || !supabaseKey) {
     console.error('FATAL: Missing Supabase credentials.');
@@ -31,7 +34,13 @@ async function runSnapshot() {
     credentials: { accessKeyId: s3AccessKeyId, secretAccessKey: s3SecretAccessKey }
   });
 
-  const orchestrator = new SnapshotOrchestrator(s3Client, sourceAdapter, s3Bucket, 'invitations_assets');
+  const orchestrator = new SnapshotOrchestrator(
+    s3Client, 
+    sourceAdapter, 
+    s3Bucket, 
+    'invitations_assets',
+    { environment, allowEmptySource }
+  );
 
   try {
     const result = await orchestrator.runSnapshot();

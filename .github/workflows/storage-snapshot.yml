@@ -1,7 +1,13 @@
 name: Production Storage Snapshot
 
 on:
-  workflow_dispatch: # Manual execution only
+  workflow_dispatch:
+    inputs:
+      ALLOW_EMPTY_SOURCE:
+        description: 'Allow snapshot to complete if zero objects are found'
+        type: boolean
+        required: false
+        default: false
 
 concurrency:
   group: production-storage-snapshot
@@ -39,3 +45,4 @@ jobs:
           BACKUP_S3_ACCESS_KEY_ID: ${{ secrets.BACKUP_S3_ACCESS_KEY_ID }}
           BACKUP_S3_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_S3_SECRET_ACCESS_KEY }}
           BACKUP_S3_BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}
+          ALLOW_EMPTY_SOURCE: ${{ github.event.inputs.ALLOW_EMPTY_SOURCE }}

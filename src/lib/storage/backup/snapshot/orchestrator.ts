@@ -12,7 +12,8 @@ export class SnapshotOrchestrator {
     private s3Client: S3Client,
     private sourceAdapter: StorageSourceAdapter,
     private destinationBucket: string,
-    private sourceBucketName: string
+    private sourceBucketName: string,
+    private options?: { environment?: string, allowEmptySource?: boolean }
   ) {
     this.writer = new ContentAddressedWriter(s3Client, destinationBucket, sourceAdapter);
   }
@@ -98,6 +99,21 @@ export class SnapshotOrchestrator {
          // Publish INCOMPLETE
          await this.uploadStatus(snapshotId, 'INCOMPLETE', entries.length, totalBytes, startTime);
          throw new Error('SNAPSHOT_INCOMPLETE: Failures occurred during content backup.');
+      }
+
+      // Empty Snapshot Guard
+      if (entries.length === 0) {
+        const isProduction = this.options?.environment === 'production';
+        const allowEmpty = this.options?.allowEmptySource === true;
+        
+        if (isProduction) {
+          if (!allowEmpty) {
+            await this.uploadStatus(snapshotId, 'FAILED', 0, 0, startTime);
+            throw new Error('EMPTY_SOURCE_REJECTED: Production snapshots cannot be empty without explicit ALLOW_EMPTY_SOURCE override.');
+          } else {
+            console.log('EMPTY_SOURCE_EXPLICITLY_ALLOWED: Continuing with empty snapshot.');
+          }
+        }
       }
 
       // 4. Build deterministic manifest
