@@ -38,7 +38,12 @@ Media is stored in a private Supabase bucket (`invitations_assets`). Server-side
 - **Database Backup**: Periodic `.dump` backups to R2. DB restore is verified.
 - **Legacy Storage Mirror**: Scheduled copying of files to R2 mirror. Legacy mirror restore is verified.
 - **Legacy Mirror Restore Drill**: Automated drill to prove mirror consistency.
-- **Immutable Storage Snapshot Architecture**: Content-addressed snapshot model. Snapshot implementation is complete but **Full DR is not yet certified**.
+- **Immutable Storage Snapshot Architecture**: Content-addressed snapshot model. 
+- **Disaster Recovery Documentation**: 
+  - [Full DR Runbook](docs/full-dr-runbook.md)
+  - [DR Certification](docs/dr-certification.md)
+  - [DR Secrets Recovery](docs/dr-secrets-recovery.md)
+  - [DR Scenarios](docs/dr-scenarios.md)
 
 ## Storage Snapshot Model
 
