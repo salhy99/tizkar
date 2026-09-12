@@ -1,5 +1,6 @@
 import { assertIsolatedEnvironment } from '../scripts/dr-environment-guard';
 import assert from 'node:assert';
+import { execSync } from 'node:child_process';
 
 describe('Disaster Recovery Environment Guard', () => {
   let originalEnv: NodeJS.ProcessEnv;
