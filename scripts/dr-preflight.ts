@@ -1,6 +1,16 @@
 import { createClient } from '@supabase/supabase-js';
 import { execSync } from 'child_process';
 import { assertIsolatedEnvironment } from './dr-environment-guard';
+type ProcessErrorLike = {
+  message?: string;
+  stderr?: string | Buffer;
+  stdout?: string | Buffer;
+  code?: string | number;
+};
+
+function isProcessErrorLike(value: unknown): value is ProcessErrorLike {
+  return typeof value === 'object' && value !== null;
+}
 
 async function main() {
   console.log('[DR Preflight] Starting...');
@@ -21,14 +31,12 @@ async function main() {
 
   console.log('\n[DR Preflight] Auditing DR_SUPABASE_DB_URL structure safely...');
   let parsedUrl: URL | null = null;
-  let possibleEncodingError = false;
   
   try {
     parsedUrl = new URL(dbUrl);
     console.log('DB_URL_PROTOCOL_VALID=YES');
   } catch {
     console.log('DB_URL_PROTOCOL_VALID=NO');
-    possibleEncodingError = true;
     console.log('PASSWORD_URL_ENCODING_ISSUE_SUSPECTED=YES');
   }
 
@@ -119,10 +127,14 @@ async function main() {
     console.error('[DR Preflight] DB connectivity failed.');
     let stderr = '';
     
-    if (err instanceof Error && 'stderr' in err && typeof (err as any).stderr === 'string') {
-      stderr = (err as any).stderr;
-    } else if (err instanceof Error && 'stderr' in err && Buffer.isBuffer((err as any).stderr)) {
-      stderr = ((err as any).stderr as Buffer).toString('utf-8');
+    if (isProcessErrorLike(err)) {
+      if (typeof err.stderr === 'string') {
+        stderr = err.stderr;
+      } else if (Buffer.isBuffer(err.stderr)) {
+        stderr = err.stderr.toString('utf-8');
+      } else if (typeof err.message === 'string') {
+        stderr = err.message;
+      }
     } else if (err instanceof Error) {
       stderr = err.message;
     }
