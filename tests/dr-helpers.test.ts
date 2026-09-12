@@ -1,5 +1,6 @@
 import { assertIsolatedEnvironment } from '../scripts/dr-environment-guard';
 import assert from 'node:assert';
+import { execSync } from 'node:child_process';
 
 describe('Disaster Recovery Environment Guard', () => {
   let originalEnv: NodeJS.ProcessEnv;
@@ -68,6 +69,16 @@ describe('Disaster Recovery Environment Guard', () => {
       process.exit = originalExit;
       console.error = originalError;
     }
+  });
+
+  describe('Workflow Pipeline Exit Propagation', () => {
+    it('should correctly propagate failure when using pipefail (SCRIPT_EXIT_1 => WORKFLOW_STEP_FAILS)', () => {
+      // This test ensures the pipeline syntax used in the workflow actually propagates failure
+      expect(() => {
+        // Run a failing script piped to tee, with pipefail enabled
+        execSync('set -o pipefail && node -e "process.exit(1)" | tee -a .test-step-summary.log', { shell: '/bin/bash' });
+      }).toThrow();
+    });
   });
 });
 
