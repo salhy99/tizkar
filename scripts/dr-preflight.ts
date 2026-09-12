@@ -31,13 +31,14 @@ async function main() {
 
   console.log('\n[DR Preflight] Auditing DR_SUPABASE_DB_URL structure safely...');
   let parsedUrl: URL | null = null;
+  let urlParseError = false;
   
   try {
     parsedUrl = new URL(dbUrl);
     console.log('DB_URL_PROTOCOL_VALID=YES');
   } catch {
-    console.log('DB_URL_PROTOCOL_VALID=NO');
-    console.log('PASSWORD_URL_ENCODING_ISSUE_SUSPECTED=YES');
+    urlParseError = true;
+    console.log('DB_URL_PROTOCOL_VALID=WARNING_UNENCODED_CHARS');
   }
 
   if (parsedUrl) {
@@ -145,7 +146,12 @@ async function main() {
     if (errorString.includes('password authentication failed')) {
       errClass = 'AUTHENTICATION_FAILED';
       console.log('AUTHENTICATION_ISSUE_SUSPECTED=YES');
-    } else if (errorString.includes('could not translate host name')) {
+    } else if (urlParseError) {
+      // If parsing failed earlier and connection failed, it is likely an encoding issue
+      console.log('PASSWORD_URL_ENCODING_ISSUE_SUSPECTED=YES');
+    }
+    
+    if (errorString.includes('could not translate host name')) {
       errClass = 'DNS_RESOLUTION_FAILED';
     } else if (errorString.includes('network is unreachable')) {
       errClass = 'NETWORK_UNREACHABLE';
