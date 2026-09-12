@@ -74,7 +74,7 @@ async function main() {
       console.log('UNEXPECTED_TIZKAR_DATA_PRESENT=NO');
     }
 
-  } catch (_error) {
+  } catch {
     console.error('[DR Preflight] DB connectivity failed.');
     process.exit(1);
   }
