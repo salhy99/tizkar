@@ -1,0 +1,94 @@
+name: DR Preflight
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    environment:
+      name: dr-drill
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify Secrets Presence
+        run: |
+          if [ -z "${{ secrets.DR_SUPABASE_URL }}" ] || [ -z "${{ secrets.DR_SUPABASE_SERVICE_ROLE }}" ] || [ -z "${{ secrets.DR_SUPABASE_DB_URL }}" ]; then
+            echo "FATAL: One or more required DR secrets are missing."
+            exit 1
+          fi
+          echo "DR_SUPABASE_URL_PRESENT=YES" >> $GITHUB_ENV
+          echo "DR_SUPABASE_SERVICE_ROLE_PRESENT=YES" >> $GITHUB_ENV
+          echo "DR_SUPABASE_DB_URL_PRESENT=YES" >> $GITHUB_ENV
+
+      - name: Verify Project Isolation
+        run: |
+          URL="${{ secrets.DR_SUPABASE_URL }}"
+          # Extract project ref safely: e.g. https://hlhrqvmmvczmvyxszzxd.supabase.co
+          REF=$(echo "$URL" | sed -E 's|https://([^.]+)\.supabase\.co.*|\1|')
+          echo "DERIVED_DR_PROJECT_REF=$REF" >> $GITHUB_ENV
+          
+          if [ "$REF" == "hnjfxdyterpbmkisaiiw" ]; then
+            echo "FATAL: Production project detected!"
+            exit 1
+          fi
+          
+          if [ "$REF" == "zxrzqyvlydsdczngxxst" ]; then
+            echo "FATAL: Development project detected!"
+            exit 1
+          fi
+          
+          if [ "$REF" != "hlhrqvmmvczmvyxszzxd" ]; then
+            echo "FATAL: Expected DR project hlhrqvmmvczmvyxszzxd not matched."
+            exit 1
+          fi
+          
+          echo "DR_PROJECT_REF_MATCH=YES" >> $GITHUB_ENV
+
+      - name: Install PostgreSQL 17 client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl ca-certificates
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+          --fail https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          . /etc/os-release
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $VERSION_CODENAME-pgdg main" \
+          | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-17
+          psql --version
+          pg_restore --version
+
+      - name: Run Read-Only Preflight Script
+        run: npx tsx scripts/dr-preflight.ts | tee -a $GITHUB_STEP_SUMMARY
+        env:
+          DR_SUPABASE_URL: ${{ secrets.DR_SUPABASE_URL }}
+          DR_SUPABASE_SERVICE_ROLE: ${{ secrets.DR_SUPABASE_SERVICE_ROLE }}
+          DR_SUPABASE_DB_URL: ${{ secrets.DR_SUPABASE_DB_URL }}
+
+      - name: Workflow Summary
+        if: always()
+        run: |
+          echo "## DR Preflight Complete" >> $GITHUB_STEP_SUMMARY
+          echo "DATABASE_WRITES: 0" >> $GITHUB_STEP_SUMMARY
+          echo "STORAGE_WRITES: 0" >> $GITHUB_STEP_SUMMARY
+          echo "AUTH_WRITES: 0" >> $GITHUB_STEP_SUMMARY
+          echo "PRODUCTION_WRITES: 0" >> $GITHUB_STEP_SUMMARY
+          echo "DATABASE_RESTORE_EXECUTED: NO" >> $GITHUB_STEP_SUMMARY
+          echo "STORAGE_RESTORE_EXECUTED: NO" >> $GITHUB_STEP_SUMMARY
