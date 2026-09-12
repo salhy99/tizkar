@@ -76,7 +76,9 @@ jobs:
           pg_restore --version
 
       - name: Run Read-Only Preflight Script
-        run: npx tsx scripts/dr-preflight.ts | tee -a $GITHUB_STEP_SUMMARY
+        run: |
+          set -o pipefail
+          npx tsx scripts/dr-preflight.ts | tee -a $GITHUB_STEP_SUMMARY
         env:
           DR_SUPABASE_URL: ${{ secrets.DR_SUPABASE_URL }}
           DR_SUPABASE_SERVICE_ROLE: ${{ secrets.DR_SUPABASE_SERVICE_ROLE }}
