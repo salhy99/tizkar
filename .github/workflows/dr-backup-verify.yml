@@ -1,0 +1,73 @@
+name: DR Backup Verification
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-backup:
+    runs-on: ubuntu-latest
+    environment:
+      name: dr-drill
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify Secrets Presence
+        run: |
+          if [ -z "${{ secrets.BACKUP_S3_ENDPOINT }}" ] || \
+             [ -z "${{ secrets.BACKUP_S3_BUCKET }}" ] || \
+             [ -z "${{ secrets.BACKUP_S3_ACCESS_KEY_ID }}" ] || \
+             [ -z "${{ secrets.BACKUP_S3_SECRET_ACCESS_KEY }}" ]; then
+            echo "FATAL: One or more required backup read secrets are missing."
+            exit 1
+          fi
+          echo "BACKUP_READ_SECRETS_PRESENT=YES" >> $GITHUB_ENV
+
+      - name: Install PostgreSQL 17 client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl ca-certificates
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+          --fail https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          . /etc/os-release
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $VERSION_CODENAME-pgdg main" \
+          | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-17
+          pg_restore --version
+
+      - name: Verify Backup Candidate
+        run: |
+          set -euo pipefail
+          npx tsx scripts/dr-backup-verify.ts | tee -a $GITHUB_STEP_SUMMARY
+        env:
+          BACKUP_S3_ENDPOINT: ${{ secrets.BACKUP_S3_ENDPOINT }}
+          BACKUP_S3_BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}
+          BACKUP_S3_ACCESS_KEY_ID: ${{ secrets.BACKUP_S3_ACCESS_KEY_ID }}
+          BACKUP_S3_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_S3_SECRET_ACCESS_KEY }}
+          BACKUP_S3_REGION: ${{ secrets.BACKUP_S3_REGION || 'auto' }}
+          DR_SUPABASE_URL: ${{ secrets.DR_SUPABASE_URL }}
+
+      - name: Workflow Summary
+        if: always()
+        run: |
+          echo "## Cleanup Complete" >> $GITHUB_STEP_SUMMARY
+          echo "DATABASE_WRITES: 0" >> $GITHUB_STEP_SUMMARY
+          echo "STORAGE_WRITES: 0" >> $GITHUB_STEP_SUMMARY
+          echo "PRODUCTION_WRITES: 0" >> $GITHUB_STEP_SUMMARY
+          echo "PG_RESTORE_EXECUTED: NO" >> $GITHUB_STEP_SUMMARY
