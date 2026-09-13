@@ -115,3 +115,45 @@ describe('DR Evidence Generation Format', () => {
     assert.strictEqual(evidence.STORAGE_RESTORE_RESULT, 'PASS');
   });
 });
+
+describe('DR Backup Verify Script Contract', () => {
+  it('fails closed when missing R2 credentials', () => {
+    try {
+      execSync('npx tsx scripts/dr-backup-verify.ts', {
+        env: { ...process.env, BACKUP_S3_ENDPOINT: '' },
+        stdio: 'pipe'
+      });
+      assert.fail('Should have thrown');
+    } catch (err: unknown) {
+      if (err && typeof err === 'object' && 'status' in err && 'stderr' in err && 'stdout' in err) {
+        assert.strictEqual((err as any).status, 1);
+        assert.match((err as any).stderr.toString() + (err as any).stdout.toString(), /FATAL: Missing read-only R2 credentials\./);
+      } else {
+        throw err;
+      }
+    }
+  });
+
+  it('fails closed when bucket is not tizkar-storage-backup', () => {
+    try {
+      execSync('npx tsx scripts/dr-backup-verify.ts', {
+        env: {
+          ...process.env,
+          BACKUP_S3_ENDPOINT: 'https://s3.example.com',
+          BACKUP_S3_ACCESS_KEY_ID: 'abc',
+          BACKUP_S3_SECRET_ACCESS_KEY: '123',
+          BACKUP_S3_BUCKET: 'wrong-bucket'
+        },
+        stdio: 'pipe'
+      });
+      assert.fail('Should have thrown');
+    } catch (err: unknown) {
+      if (err && typeof err === 'object' && 'status' in err && 'stderr' in err && 'stdout' in err) {
+        assert.strictEqual((err as any).status, 1);
+        assert.match((err as any).stderr.toString() + (err as any).stdout.toString(), /FATAL: Unexpected backup bucket/);
+      } else {
+        throw err;
+      }
+    }
+  });
+});

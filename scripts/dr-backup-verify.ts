@@ -16,12 +16,8 @@ function isProcessErrorLike(value: unknown): value is ProcessErrorLike {
   return typeof value === 'object' && value !== null;
 }
 
-async function streamToBuffer(stream: Readable): Promise<Buffer> {
-  const chunks: Uint8Array[] = [];
-  for await (const chunk of stream) {
-    chunks.push(chunk);
-  }
-  return Buffer.concat(chunks);
+export function isReadableStream(body: unknown): body is Readable {
+  return typeof body === 'object' && body !== null && 'pipe' in body && typeof (body as { pipe?: unknown }).pipe === 'function';
 }
 
 async function main() {
@@ -89,8 +85,12 @@ async function main() {
     Key: newestManifestObj.Key
   }));
 
-  const manifestBody = await streamToBuffer(manifestResponse.Body);
-  const manifest = JSON.parse(manifestBody.toString('utf-8'));
+  const manifestBody = manifestResponse.Body;
+  if (!manifestBody) {
+    throw new Error('BACKUP_MANIFEST_BODY_MISSING');
+  }
+  const manifestBytes = await manifestBody.transformToByteArray();
+  const manifest = JSON.parse(Buffer.from(manifestBytes).toString('utf-8'));
 
   console.log(`DATABASE_BACKUP_ID: ${manifest.backup_id}`);
   console.log(`DATABASE_BACKUP_TIMESTAMP: ${manifest.completed_at}`);
@@ -139,13 +139,22 @@ async function main() {
   const dumpPath = path.join(tempDir, 'backup.dump');
   
   const writeStream = fs.createWriteStream(dumpPath);
-  const bodyStream = dumpResponse.Body as Readable;
+  const archiveBody = dumpResponse.Body;
   
-  await new Promise((resolve, reject) => {
-    bodyStream.pipe(writeStream)
-      .on('error', reject)
-      .on('finish', resolve);
-  });
+  if (!archiveBody) {
+    throw new Error('BACKUP_ARCHIVE_BODY_MISSING');
+  }
+  
+  if (isReadableStream(archiveBody)) {
+    await new Promise<void>((resolve, reject) => {
+      archiveBody.pipe(writeStream)
+        .on('error', reject)
+        .on('finish', () => resolve());
+    });
+  } else {
+    const bytes = await archiveBody.transformToByteArray();
+    fs.writeFileSync(dumpPath, bytes);
+  }
 
   console.log(`[Verify] File downloaded to runner temp.`);
 
