@@ -55,12 +55,17 @@ jobs:
       - name: Verify Backup Candidate
         run: |
           set -euo pipefail
-          command -v pg_restore
-          pg_restore --version
-          command -v psql || true
-          psql --version || true
+          test -x /usr/lib/postgresql/17/bin/pg_restore || (echo "FATAL: pg_restore 17 not executable" && exit 1)
+          echo "PG17_BINARY_PATH=/usr/lib/postgresql/17/bin/pg_restore"
+          PG17_VERSION=$(/usr/lib/postgresql/17/bin/pg_restore --version)
+          echo "PG17_BINARY_VERSION=$PG17_VERSION"
+          if [[ "$PG17_VERSION" != *"17."* ]]; then
+            echo "FATAL: pg_restore is not major version 17."
+            exit 1
+          fi
           npx tsx scripts/dr-backup-verify.ts | tee -a $GITHUB_STEP_SUMMARY
         env:
+          PG_RESTORE_BIN: /usr/lib/postgresql/17/bin/pg_restore
           BACKUP_S3_ENDPOINT: ${{ secrets.BACKUP_S3_ENDPOINT }}
           BACKUP_S3_BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}
           BACKUP_S3_ACCESS_KEY_ID: ${{ secrets.BACKUP_S3_ACCESS_KEY_ID }}

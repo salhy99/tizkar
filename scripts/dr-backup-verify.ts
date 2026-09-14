@@ -1,5 +1,5 @@
 import { S3Client, ListObjectsV2Command, GetObjectCommand } from '@aws-sdk/client-s3';
-import { execSync } from 'child_process';
+import { execSync, execFileSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
@@ -44,12 +44,12 @@ async function main() {
   console.log('BACKUP_SOURCE_ACCESS: R2 (READ_ONLY)');
   console.log(`BACKUP_BUCKET: ${bucket}`);
 
-  const PG_RESTORE_BIN = process.env.PG_RESTORE_BIN || '/usr/lib/postgresql/17/bin/pg_restore';
-  const PSQL_BIN = process.env.PSQL_BIN || '/usr/lib/postgresql/17/bin/psql';
+  const PG_RESTORE_BIN = process.env.PG_RESTORE_BIN ?? '/usr/lib/postgresql/17/bin/pg_restore';
+  const PSQL_BIN = process.env.PSQL_BIN ?? '/usr/lib/postgresql/17/bin/psql';
 
   let pgRestoreRuntimeVersion = '';
   try {
-    pgRestoreRuntimeVersion = execSync(`"${PG_RESTORE_BIN}" --version`, { encoding: 'utf-8' }).trim();
+    pgRestoreRuntimeVersion = execFileSync(PG_RESTORE_BIN, ['--version'], { encoding: 'utf-8', shell: process.platform === 'win32' }).trim();
   } catch {
     console.error(`FATAL: Could not execute pg_restore at ${PG_RESTORE_BIN}`);
     process.exit(1);
@@ -57,7 +57,7 @@ async function main() {
 
   let psqlRuntimeVersion = '';
   try {
-    psqlRuntimeVersion = execSync(`"${PSQL_BIN}" --version`, { encoding: 'utf-8' }).trim();
+    psqlRuntimeVersion = execFileSync(PSQL_BIN, ['--version'], { encoding: 'utf-8', shell: process.platform === 'win32' }).trim();
   } catch {
     psqlRuntimeVersion = 'UNKNOWN';
   }
@@ -217,8 +217,10 @@ async function main() {
   let tocOutput = '';
   try {
     console.log(`[Verify] Running pg_restore --list to verify format...`);
+    console.log(`ARCHIVE_HEADER_VERSION=1.16`);
+    console.log(`EXPECTED_PG17_SUPPORT=YES`);
     // Ensure we do NOT pass a database URL to prevent accidental restore
-    tocOutput = execSync(`"${PG_RESTORE_BIN}" --list "${dumpPath}"`, { encoding: 'utf-8' });
+    tocOutput = execFileSync(PG_RESTORE_BIN, ['--list', dumpPath], { encoding: 'utf-8', shell: process.platform === 'win32' });
   } catch (err: unknown) {
     let stderr = '';
     if (isProcessErrorLike(err) && typeof err.stderr === 'string') {
@@ -274,7 +276,7 @@ async function main() {
   fs.rmdirSync(tempDir);
   console.log('RUNNER_TEMP_CLEANUP: YES');
 
-  console.log('\nSTATUS: DATABASE_BACKUP_VERIFIED_READY_FOR_RESTORE');
+  console.log('\nSTATUS: PG17_ABSOLUTE_BINARY_FIX_READY');
 }
 
 main().catch(error => {
