@@ -261,12 +261,10 @@ describe('DR Backup Verify Script Contract', () => {
     const fakeOutput = `
 ; Archive created at 2026-09-14 15:43:24
 123; 1259 3456 TABLE public profiles my_role
-124; 1259 3456 TABLE public admins my_role
 125; 1259 3456 TABLE public invitations my_role
 126; 1259 3456 TABLE public invitation_versions my_role
 127; 1259 3456 TABLE public orders my_role
 128; 0 3456 TABLE DATA public profiles my_role
-129; 0 3456 TABLE DATA public admins my_role
 130; 0 3456 TABLE DATA public invitations my_role
 131; 0 3456 TABLE DATA public invitation_versions my_role
 132; 0 3456 TABLE DATA public orders my_role

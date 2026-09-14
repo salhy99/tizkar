@@ -247,11 +247,10 @@ async function main() {
   const storagePresent = tocOutput.includes(' SCHEMA storage ') || tocOutput.includes(' SCHEMA - storage ');
   
   let publicNamespaceCount = 0;
-  const expectedPublicTables = ['profiles', 'admins', 'invitations', 'invitation_versions', 'orders'];
+  const expectedPublicTables = ['profiles', 'invitations', 'invitation_versions', 'orders'];
   const archivedPublicTables: string[] = [];
   
   let profilesData = false;
-  let adminsData = false;
   let invitationsData = false;
   let invitationVersionsData = false;
   let ordersData = false;
@@ -280,14 +279,12 @@ async function main() {
     
     // Check tables
     if (line.includes(' TABLE public profiles ')) archivedPublicTables.push('profiles');
-    if (line.includes(' TABLE public admins ')) archivedPublicTables.push('admins');
     if (line.includes(' TABLE public invitations ')) archivedPublicTables.push('invitations');
     if (line.includes(' TABLE public invitation_versions ')) archivedPublicTables.push('invitation_versions');
     if (line.includes(' TABLE public orders ')) archivedPublicTables.push('orders');
     
     // Check data
     if (line.includes(' TABLE DATA public profiles ')) profilesData = true;
-    if (line.includes(' TABLE DATA public admins ')) adminsData = true;
     if (line.includes(' TABLE DATA public invitations ')) invitationsData = true;
     if (line.includes(' TABLE DATA public invitation_versions ')) invitationVersionsData = true;
     if (line.includes(' TABLE DATA public orders ')) ordersData = true;
@@ -326,7 +323,6 @@ async function main() {
   console.log(`MISSING_CRITICAL_PUBLIC_TABLES: ${missingCriticalPublicTables}`);
   
   console.log(`PROFILES_TABLE_DATA_PRESENT: ${profilesData ? 'YES' : 'NO'}`);
-  console.log(`ADMINS_TABLE_DATA_PRESENT: ${adminsData ? 'YES' : 'NO'}`);
   console.log(`INVITATIONS_TABLE_DATA_PRESENT: ${invitationsData ? 'YES' : 'NO'}`);
   console.log(`INVITATION_VERSIONS_TABLE_DATA_PRESENT: ${invitationVersionsData ? 'YES' : 'NO'}`);
   console.log(`ORDERS_TABLE_DATA_PRESENT: ${ordersData ? 'YES' : 'NO'}`);
