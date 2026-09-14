@@ -2,6 +2,16 @@ import { assertIsolatedEnvironment } from '../scripts/dr-environment-guard';
 import assert from 'node:assert';
 import { execSync } from 'node:child_process';
 
+interface ExecSyncError extends Error {
+  status: number | null;
+  stderr: Buffer | string;
+  stdout: Buffer | string;
+}
+
+function isExecSyncError(err: unknown): err is ExecSyncError {
+  return err instanceof Error && 'status' in err && 'stderr' in err && 'stdout' in err;
+}
+
 describe('Disaster Recovery Environment Guard', () => {
   let originalEnv: NodeJS.ProcessEnv;
 
@@ -125,9 +135,9 @@ describe('DR Backup Verify Script Contract', () => {
       });
       assert.fail('Should have thrown');
     } catch (err: unknown) {
-      if (err && typeof err === 'object' && 'status' in err && 'stderr' in err && 'stdout' in err) {
-        assert.strictEqual((err as any).status, 1);
-        assert.match((err as any).stderr.toString() + (err as any).stdout.toString(), /FATAL: Missing read-only R2 credentials\./);
+      if (isExecSyncError(err)) {
+        assert.strictEqual(err.status, 1);
+        assert.match(err.stderr.toString() + err.stdout.toString(), /FATAL: Missing read-only R2 credentials\./);
       } else {
         throw err;
       }
@@ -148,9 +158,9 @@ describe('DR Backup Verify Script Contract', () => {
       });
       assert.fail('Should have thrown');
     } catch (err: unknown) {
-      if (err && typeof err === 'object' && 'status' in err && 'stderr' in err && 'stdout' in err) {
-        assert.strictEqual((err as any).status, 1);
-        assert.match((err as any).stderr.toString() + (err as any).stdout.toString(), /FATAL: Unexpected backup bucket/);
+      if (isExecSyncError(err)) {
+        assert.strictEqual(err.status, 1);
+        assert.match(err.stderr.toString() + err.stdout.toString(), /FATAL: Unexpected backup bucket/);
       } else {
         throw err;
       }
