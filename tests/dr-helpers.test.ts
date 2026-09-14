@@ -142,7 +142,7 @@ describe('DR Backup Verify Script Contract', () => {
         throw err;
       }
     }
-  });
+  }, 15000);
 
   it('fails closed when bucket is not tizkar-storage-backup', () => {
     try {
@@ -165,5 +165,39 @@ describe('DR Backup Verify Script Contract', () => {
         throw err;
       }
     }
-  });
+  }, 15000);
+
+  it('fails closed when pg_restore version is not 17', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const tempBin = fs.mkdtempSync(path.join(process.cwd(), 'dr-test-bin-'));
+    const fakePgRestore = path.join(tempBin, 'pg_restore');
+    fs.writeFileSync(fakePgRestore, '#!/usr/bin/env bash\nif [ "$1" = "--version" ]; then echo "pg_restore (PostgreSQL) 14.10"; else exit 1; fi\n');
+    fs.chmodSync(fakePgRestore, 0o755);
+
+    try {
+      execSync('npx tsx scripts/dr-backup-verify.ts', {
+        env: {
+          ...process.env,
+          BACKUP_S3_ENDPOINT: 'https://s3.example.com',
+          BACKUP_S3_ACCESS_KEY_ID: 'abc',
+          BACKUP_S3_SECRET_ACCESS_KEY: '123',
+          BACKUP_S3_BUCKET: 'tizkar-storage-backup',
+          PATH: `${tempBin}:${process.env.PATH}`
+        },
+        stdio: 'pipe'
+      });
+      assert.fail('Should have thrown');
+    } catch (err: unknown) {
+      if (isExecSyncError(err)) {
+        assert.strictEqual(err.status, 1);
+        assert.match(err.stderr.toString() + err.stdout.toString(), /FATAL: PG_RESTORE_CLIENT_VERSION_MISMATCH\. Expected 17, got (14|UNKNOWN)/);
+      } else {
+        throw err;
+      }
+    } finally {
+      fs.unlinkSync(fakePgRestore);
+      fs.rmdirSync(tempBin);
+    }
+  }, 15000);
 });

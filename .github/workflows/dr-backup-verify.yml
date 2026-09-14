@@ -54,6 +54,7 @@ jobs:
       - name: Verify Backup Candidate
         run: |
           set -euo pipefail
+          export PATH="/usr/lib/postgresql/17/bin:$PATH"
           npx tsx scripts/dr-backup-verify.ts | tee -a $GITHUB_STEP_SUMMARY
         env:
           BACKUP_S3_ENDPOINT: ${{ secrets.BACKUP_S3_ENDPOINT }}

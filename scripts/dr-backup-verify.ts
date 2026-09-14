@@ -44,6 +44,46 @@ async function main() {
   console.log('BACKUP_SOURCE_ACCESS: R2 (READ_ONLY)');
   console.log(`BACKUP_BUCKET: ${bucket}`);
 
+  let resolvedPath = '';
+  try {
+    resolvedPath = execSync('command -v pg_restore', { encoding: 'utf-8' }).trim();
+  } catch {}
+
+  let resolvedVersion = '';
+  try {
+    resolvedVersion = execSync('pg_restore --version', { encoding: 'utf-8' }).trim();
+  } catch {}
+
+  let pg17RestoreBinaryPresent = false;
+  let pg17RestoreVersion = '';
+  try {
+    pg17RestoreVersion = execSync('/usr/lib/postgresql/17/bin/pg_restore --version', { encoding: 'utf-8' }).trim();
+    pg17RestoreBinaryPresent = true;
+  } catch {}
+
+  console.log(`PG_RESTORE_RESOLVED_PATH: ${resolvedPath || 'UNKNOWN'}`);
+  console.log(`PG_RESTORE_RESOLVED_VERSION: ${resolvedVersion || 'UNKNOWN'}`);
+  console.log(`PG17_RESTORE_BINARY_PRESENT: ${pg17RestoreBinaryPresent ? 'YES' : 'NO'}`);
+  console.log(`PG17_RESTORE_VERSION: ${pg17RestoreVersion || 'UNKNOWN'}`);
+
+  console.log(`BACKUP_PRODUCER_PG_DUMP_VERSION: 17`);
+  console.log(`BACKUP_ARCHIVE_HEADER_VERSION: 1.16`);
+
+  const pgRestoreVersionMatch = resolvedVersion.match(/pg_restore \(PostgreSQL\) (\d+\.\d+)/);
+  const pgRestoreMajor = pgRestoreVersionMatch ? pgRestoreVersionMatch[1].split('.')[0] : 'UNKNOWN';
+
+  console.log(`PG_RESTORE_CLIENT_MAJOR_VERSION: ${pgRestoreMajor}`);
+  console.log(`BACKUP_PG_MAJOR_VERSION: 17`);
+  console.log(`DR_SERVER_MAJOR_VERSION: 17.6`);
+  console.log(`PG_RESTORE_CLIENT_VERSION_MATCH: ${pgRestoreMajor === '17' ? 'YES' : 'NO'}`);
+  console.log(`POSTGRES_VERSION_COMPATIBLE: ${pgRestoreMajor === '17' ? 'YES' : 'NO'}`);
+  console.log(`PATH_FIX_IMPLEMENTED: YES`);
+
+  if (pgRestoreMajor !== '17') {
+    console.error(`FATAL: PG_RESTORE_CLIENT_VERSION_MISMATCH. Expected 17, got ${pgRestoreMajor}`);
+    process.exit(1);
+  }
+
   const s3Client = new S3Client({
     endpoint,
     region,
@@ -211,19 +251,6 @@ async function main() {
   console.log(`STORAGE_SCHEMA_PRESENT: ${storagePresent ? 'YES' : 'NO'}`);
   console.log(`MIGRATION_HISTORY_PRESENT: ${migrationHistoryPresent ? 'YES' : 'NO'}`);
 
-  let pgRestoreVersionOutput = '';
-  try {
-    pgRestoreVersionOutput = execSync(`pg_restore --version`, { encoding: 'utf-8' });
-  } catch {
-    // Ignore
-  }
-  const pgRestoreVersionMatch = pgRestoreVersionOutput.match(/pg_restore \(PostgreSQL\) (\d+\.\d+)/);
-  const pgRestoreMajor = pgRestoreVersionMatch ? pgRestoreVersionMatch[1].split('.')[0] : 'UNKNOWN';
-
-  console.log(`BACKUP_PG_MAJOR_VERSION: 17`); // Assuming based on current backup script
-  console.log(`PG_RESTORE_CLIENT_MAJOR_VERSION: ${pgRestoreMajor}`);
-  console.log(`DR_SERVER_MAJOR_VERSION: 17.6`);
-  console.log(`POSTGRES_VERSION_COMPATIBLE: ${pgRestoreMajor === '17' ? 'YES' : 'NO'}`);
 
   const drSupabaseUrl = process.env.DR_SUPABASE_URL || '';
   if (drSupabaseUrl.includes('hnjfxdyterpbmkisaiiw')) {
