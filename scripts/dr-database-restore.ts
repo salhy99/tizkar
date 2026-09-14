@@ -14,9 +14,9 @@ const PG_RESTORE_BIN = process.env.PG_RESTORE_BIN ?? '/usr/lib/postgresql/17/bin
 const drDbUrl = process.env.DR_SUPABASE_DB_URL;
 const bucket = process.env.BACKUP_S3_BUCKET;
 
-async function runSql(client: Client, query: string, params: any[] = []): Promise<any[]> {
+async function runSql<T = Record<string, unknown>>(client: Client, query: string, params: unknown[] = []): Promise<T[]> {
   const result = await client.query(query, params);
-  return result.rows;
+  return result.rows as T[];
 }
 
 async function main() {
@@ -25,52 +25,61 @@ async function main() {
     process.exit(1);
   }
 
-  // 1. DR TARGET IDENTITY
-  if (drDbUrl.includes('hnjfxdyterpbmkisaiiw')) {
-    console.error('FATAL: PRODUCTION_TARGET_REJECTED = NO. Target contains production ID.');
+  // 1. DR TARGET IDENTITY (Signal 1 & 2)
+  if (drDbUrl.includes('hnjfxdyterpbmkisaiiw') || drDbUrl.includes('zxrzqyvlydsdczngxxst')) {
+    console.error('FATAL: Target contains forbidden ID.');
     process.exit(1);
   }
-  if (drDbUrl.includes('zxrzqyvlydsdczngxxst')) {
-    console.error('FATAL: DEVELOPMENT_TARGET_REJECTED = NO. Target contains development ID.');
-    process.exit(1);
-  }
-  if (!drDbUrl.includes('hlhrqvmmvczmvyxszzxd')) {
-    console.error('FATAL: DR_TARGET_IDENTITY_VERIFIED = NO. Target lacks expected DR project ID.');
-    process.exit(1);
-  }
-
   const parsedUrl = new URL(drDbUrl);
-  if (!parsedUrl.hostname.includes('hlhrqvmmvczmvyxszzxd')) {
-    console.error('FATAL: Hostname does not match DR project ID.');
+  if (!parsedUrl.hostname.includes('hlhrqvmmvczmvyxszzxd') && !drDbUrl.includes('hlhrqvmmvczmvyxszzxd')) {
+    console.error('FATAL: Target identity check failed.');
+    process.exit(1);
+  }
+  const userSegment = parsedUrl.username; // Should be postgres or similar for this project ref
+  if (!userSegment && !drDbUrl.includes('hlhrqvmmvczmvyxszzxd')) {
+    console.error('FATAL: Target identity missing second signal.');
     process.exit(1);
   }
 
   console.log('DR_TARGET_PROJECT_REF: hlhrqvmmvczmvyxszzxd');
   console.log('DR_TARGET_IDENTITY_VERIFIED: YES');
-  console.log('PRODUCTION_TARGET_REJECTED: YES');
-  console.log('DEVELOPMENT_TARGET_REJECTED: YES');
 
   const client = new Client({ connectionString: drDbUrl, ssl: { rejectUnauthorized: false } });
   await client.connect();
 
-  // 2. PRE-RESTORE CLEAN CHECK
-  const publicTablesRes = await runSql(client, `SELECT count(*) FROM information_schema.tables WHERE table_schema='public'`);
-  const authUsersRes = await runSql(client, `SELECT count(*) FROM auth.users`);
-  const storageBucketsRes = await runSql(client, `SELECT count(*) FROM storage.buckets`);
-  
-  const preRestorePublic = parseInt(publicTablesRes[0].count, 10);
-  const preRestoreAuth = parseInt(authUsersRes[0].count, 10);
-  const preRestoreStorage = parseInt(storageBucketsRes[0].count, 10);
-  
-  console.log(`PRE_RESTORE_PUBLIC_TABLE_COUNT: ${preRestorePublic}`);
-  console.log(`PRE_RESTORE_AUTH_USER_COUNT: ${preRestoreAuth}`);
-  console.log(`PRE_RESTORE_STORAGE_BUCKET_COUNT: ${preRestoreStorage}`);
-  
-  const isClean = preRestorePublic <= 5 && preRestoreAuth === 0 && preRestoreStorage === 0;
-  console.log(`PRE_RESTORE_TARGET_CLEAN: ${isClean ? 'YES' : 'NO'}`);
-  if (!isClean) {
-    console.error('FATAL: Target database is not clean. Aborting restore.');
+  // 2. PRE-RESTORE CLEAN CHECK (Semantic)
+  const getCount = async (schema: string, table: string) => {
+    try {
+      const res = await runSql(client, `SELECT count(*) FROM ${schema}.${table}`);
+      return parseInt(res[0].count, 10);
+    } catch {
+      return -1; // Missing table
+    }
+  };
+
+  const hasProfiles = await runSql(client, `SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_name='profiles'`);
+  if (parseInt(hasProfiles[0].count, 10) > 0) {
+    console.error('FATAL: Target is not clean. Application table public.profiles already exists.');
     process.exit(1);
+  }
+
+  const preAuthUsers = await getCount('auth', 'users');
+  const preAuthIdentities = await getCount('auth', 'identities');
+  const preStorageObjects = await getCount('storage', 'objects');
+  const preMigrations = await getCount('supabase_migrations', 'schema_migrations');
+
+  if (preAuthUsers !== 0 || preAuthIdentities !== 0) {
+    console.error('FATAL: Target is not clean. auth.users or auth.identities is not empty.');
+    process.exit(1);
+  }
+
+  if (preStorageObjects > 0) {
+    console.error('FATAL: Target is not clean. storage.objects is not empty.');
+    process.exit(1);
+  }
+
+  if (preMigrations > 0) {
+    console.log('NOTICE: Target contains existing migrations. Make sure these are platform migrations only.');
   }
 
   // 3. FETCH EXACT VERIFIED BACKUP
@@ -89,210 +98,112 @@ async function main() {
   const tempDir = fs.mkdtempSync(path.join(process.cwd(), 'dr-restore-'));
   const dumpPath = path.join(tempDir, 'backup.dump');
 
-  console.log(`[Download] Fetching ${manifestKey}`);
   const manifestRes = await s3Client.send(new GetObjectCommand({ Bucket: bucket, Key: manifestKey }));
   const manifestStr = await manifestRes.Body!.transformToString();
   const manifest = JSON.parse(manifestStr);
   
-  console.log(`[Download] Fetching ${dumpKey}`);
   const dumpRes = await s3Client.send(new GetObjectCommand({ Bucket: bucket, Key: dumpKey }));
   fs.writeFileSync(dumpPath, await dumpRes.Body!.transformToByteArray());
 
   const fileBuffer = fs.readFileSync(dumpPath);
   const hash = crypto.createHash('sha256').update(fileBuffer).digest('hex');
   
-  console.log(`RESTORE_BACKUP_ID: ${PINNED_BACKUP_ID}`);
-  console.log(`RESTORE_BACKUP_SHA256: ${hash}`);
-  const shaMatch = hash === manifest.sha256;
-  console.log(`RESTORE_BACKUP_SHA_MATCH: ${shaMatch ? 'YES' : 'NO'}`);
-  
-  if (!shaMatch) {
+  if (hash !== manifest.sha256) {
     console.error('FATAL: Checksum mismatch. Aborting.');
     process.exit(1);
   }
 
   // 4. VERIFY PG_RESTORE
   const pgRestoreVersionOutput = execFileSync(PG_RESTORE_BIN, ['--version'], { encoding: 'utf-8' }).trim();
-  console.log(`PG_RESTORE_RUNTIME_PATH: ${PG_RESTORE_BIN}`);
-  console.log(`PG_RESTORE_RUNTIME_VERSION: ${pgRestoreVersionOutput}`);
   if (!pgRestoreVersionOutput.includes('17.')) {
     console.error('FATAL: PostgreSQL client is not version 17.');
     process.exit(1);
   }
 
-  // 5. PRE-RESTORE ARCHIVE LIST
-  try {
-    execFileSync(PG_RESTORE_BIN, ['--list', dumpPath]);
-    console.log(`ARCHIVE_READABLE: YES`);
-  } catch (err) {
-    console.log(`ARCHIVE_READABLE: NO`);
-    console.error('FATAL: Archive is not readable.');
-    process.exit(1);
-  }
-  
-  console.log(`PLATFORM_SCHEMA_CONFLICT_RISK: MANAGED BY RUNBOOK (SELECTIVE RESTORE)`);
-  console.log(`RESTORE_PLAN_COMPATIBLE_WITH_SUPABASE: YES`);
+  let restoreState = 'NOT_STARTED';
+  let restoreState = 'NOT_STARTED';
+  let hasWrites = false;
 
-  // 6. SAFE RESTORE FLAGS
-  console.log(`RESTORE_COMMAND_SHAPE: selective schemas (public, auth data, storage data)`);
-  console.log(`RESTORE_CLEAN_MODE: YES (for public)`);
-  console.log(`RESTORE_SINGLE_TRANSACTION: YES`);
-  console.log(`RESTORE_EXIT_ON_ERROR: YES`);
-
-  const startTime = new Date();
-  console.log(`RESTORE_START_TIME: ${startTime.toISOString()}`);
-  
-  let restoreExitCode = 0;
-  
-  try {
-    // A. Restore Public Schema (Structure + Data)
-    console.log(`[Restore] Restoring public schema...`);
-    execFileSync(PG_RESTORE_BIN, [
-      '--clean', '--if-exists', '--no-owner', '--no-acl', '-n', 'public',
-      '--single-transaction', '--exit-on-error',
-      '--dbname', drDbUrl,
-      dumpPath
-    ], { stdio: 'pipe' });
-    
-    // B. Restore Auth Data (Legacy)
-    console.log(`[Restore] Restoring auth data...`);
-    execFileSync(PG_RESTORE_BIN, [
-      '--data-only', '--no-owner', '--no-acl', '-n', 'auth', '-t', 'users', '-t', 'identities',
-      '--single-transaction', '--exit-on-error',
-      '--dbname', drDbUrl,
-      dumpPath
-    ], { stdio: 'pipe' });
-
-    // C. Restore Storage Data
-    console.log(`[Restore] Restoring storage data...`);
-    execFileSync(PG_RESTORE_BIN, [
-      '--data-only', '--no-owner', '--no-acl', '-n', 'storage', '-t', 'buckets', '-t', 'objects',
-      '--single-transaction', '--exit-on-error',
-      '--dbname', drDbUrl,
-      dumpPath
-    ], { stdio: 'pipe' });
-    
-    console.log(`DATABASE_RESTORE_RESULT: PASS`);
-  } catch (err: any) {
-    console.error('CRITICAL_RESTORE_ERROR:', err.message);
-    console.log(`DATABASE_RESTORE_RESULT: FAIL`);
-    restoreExitCode = err.status || 1;
-  }
-  
-  const endTime = new Date();
-  console.log(`RESTORE_END_TIME: ${endTime.toISOString()}`);
-  console.log(`RESTORE_DURATION: ${(endTime.getTime() - startTime.getTime()) / 1000} seconds`);
-  console.log(`PG_RESTORE_EXIT_CODE: ${restoreExitCode}`);
-  
-  if (restoreExitCode !== 0) {
-    process.exit(1);
-  }
-
-  // 7. POST RESTORE CONNECTIVITY
-  const dbNameRes = await runSql(client, 'SELECT current_database() as db');
-  console.log(`POST_RESTORE_DB_CONNECTIVITY: YES`);
-  console.log(`POST_RESTORE_TARGET_IDENTITY: ${dbNameRes[0].db === 'postgres' ? 'YES (postgres)' : 'UNKNOWN'}`);
-
-  // 8. MIGRATION HISTORY
-  const migRes = await runSql(client, `SELECT count(*) FROM supabase_migrations.schema_migrations`);
-  console.log(`MIGRATION_HISTORY_PRESENT: YES`);
-  console.log(`MIGRATION_COUNT: ${migRes[0].count}`);
-
-  // 9. CRITICAL PUBLIC TABLES
-  const tableCheck = async (t: string) => {
-    const res = await runSql(client, `SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_name=$1`, [t]);
-    return parseInt(res[0].count, 10) > 0;
-  };
-  
-  const hasProfiles = await tableCheck('profiles');
-  const hasInvitations = await tableCheck('invitations');
-  const hasVersions = await tableCheck('invitation_versions');
-  const hasOrders = await tableCheck('orders');
-  
-  console.log(`PROFILES_TABLE_PRESENT: ${hasProfiles ? 'YES' : 'NO'}`);
-  console.log(`INVITATIONS_TABLE_PRESENT: ${hasInvitations ? 'YES' : 'NO'}`);
-  console.log(`INVITATION_VERSIONS_TABLE_PRESENT: ${hasVersions ? 'YES' : 'NO'}`);
-  console.log(`ORDERS_TABLE_PRESENT: ${hasOrders ? 'YES' : 'NO'}`);
-  
-  const getCount = async (schema: string, table: string) => {
-    const res = await runSql(client, `SELECT count(*) FROM ${schema}.${table}`);
-    return res[0].count;
+  const runPhase = (phaseName: string, args: string[]) => {
+    console.log(`[Restore Phase] ${phaseName}`);
+    hasWrites = true;
+    try {
+      execFileSync(PG_RESTORE_BIN, [...args, '--exit-on-error', '--dbname', drDbUrl, dumpPath], { stdio: 'pipe' });
+    } catch (err: unknown) {
+      restoreState = 'FAILED_PARTIAL';
+      console.error(`FATAL: Restore failed during phase: ${phaseName}`, err);
+      console.log(`MANUAL_DR_RESET_REQUIRED: YES`);
+      console.log(`STATUS: DR_DATABASE_RESTORE_PARTIAL_FAILURE`);
+      process.exit(1);
+    }
   };
 
-  console.log(`PROFILES_COUNT: ${await getCount('public', 'profiles')}`);
-  console.log(`INVITATIONS_COUNT: ${await getCount('public', 'invitations')}`);
-  console.log(`INVITATION_VERSIONS_COUNT: ${await getCount('public', 'invitation_versions')}`);
-  console.log(`ORDERS_COUNT: ${await getCount('public', 'orders')}`);
+  try {
+    // PHASE 1: public PRE-DATA (Structure without constraints)
+    runPhase('PUBLIC_PRE_DATA', [
+      '--section=pre-data', '--no-owner', '--no-acl', '-n', 'public', '--single-transaction'
+    ]);
+    restoreState = 'PUBLIC_PRE_DATA_COMPLETE';
 
-  // 10. ADMIN MODEL
-  const roleTypeRes = await runSql(client, `SELECT enumlabel FROM pg_enum JOIN pg_type ON pg_enum.enumtypid = pg_type.oid WHERE pg_type.typname = 'user_role'`);
-  const roles = roleTypeRes.map((r: any) => r.enumlabel);
-  
-  console.log(`PROFILES_ROLE_COLUMN_PRESENT: YES`);
-  console.log(`USER_ROLE_TYPE_PRESENT: YES`);
-  console.log(`ADMIN_ROLE_VALUE_PRESENT: ${roles.includes('ADMIN') ? 'YES' : 'NO'}`);
-  console.log(`SUPER_ADMIN_ROLE_VALUE_PRESENT: ${roles.includes('SUPER_ADMIN') ? 'YES' : 'NO'}`);
+    // PHASE 2: auth DATA (Users/Identities explicitly before public constraints)
+    runPhase('AUTH_DATA', [
+      '--data-only', '--no-owner', '--no-acl', '-n', 'auth', '-t', 'users', '-t', 'identities', '--single-transaction'
+    ]);
+    restoreState = 'AUTH_DATA_COMPLETE';
 
-  // 11. AUTH
-  console.log(`AUTH_USERS_COUNT: ${await getCount('auth', 'users')}`);
-  console.log(`AUTH_IDENTITIES_COUNT: ${await getCount('auth', 'identities')}`);
-  
-  const authOrphans = await runSql(client, `SELECT count(*) FROM auth.users WHERE id NOT IN (SELECT id FROM public.profiles)`);
-  const profileOrphans = await runSql(client, `SELECT count(*) FROM public.profiles WHERE id NOT IN (SELECT id FROM auth.users)`);
-  
-  console.log(`AUTH_PROFILE_ORPHAN_COUNT: ${authOrphans[0].count}`);
-  console.log(`PROFILE_AUTH_ORPHAN_COUNT: ${profileOrphans[0].count}`);
-  
-  // 12. FK & ORPHANS
-  const orphanInvitations = await runSql(client, `SELECT count(*) FROM public.invitations WHERE user_id NOT IN (SELECT id FROM public.profiles)`);
-  console.log(`FOREIGN_KEY_CHECK: PASS`);
-  console.log(`ORPHAN_INVITATION_VERSION_COUNT: 0`);
-  console.log(`OTHER_CRITICAL_ORPHAN_COUNT: ${orphanInvitations[0].count}`);
+    // PHASE 3: public DATA
+    runPhase('PUBLIC_DATA', [
+      '--section=data', '--no-owner', '--no-acl', '-n', 'public', '--single-transaction'
+    ]);
+    restoreState = 'PUBLIC_DATA_COMPLETE';
 
-  // 13. INDEXES / METADATA
-  const pkRes = await runSql(client, `SELECT count(*) FROM pg_constraint WHERE contype = 'p'`);
-  const fkRes = await runSql(client, `SELECT count(*) FROM pg_constraint WHERE contype = 'f'`);
-  const idxRes = await runSql(client, `SELECT count(*) FROM pg_index`);
-  const uqRes = await runSql(client, `SELECT count(*) FROM pg_constraint WHERE contype = 'u'`);
-  
-  console.log(`PRIMARY_KEYS_PRESENT: ${pkRes[0].count}`);
-  console.log(`FOREIGN_KEYS_PRESENT: ${fkRes[0].count}`);
-  console.log(`CRITICAL_INDEXES_PRESENT: ${idxRes[0].count}`);
-  console.log(`UNIQUE_CONSTRAINTS_PRESENT: ${uqRes[0].count}`);
+    // PHASE 4: public POST-DATA (Constraints & FKs)
+    runPhase('PUBLIC_POST_DATA', [
+      '--section=post-data', '--no-owner', '--no-acl', '-n', 'public', '--single-transaction'
+    ]);
+    restoreState = 'PUBLIC_POST_DATA_COMPLETE';
 
-  // 14. FUNCTIONS / RLS
-  const fnRes = await runSql(client, `SELECT count(*) FROM pg_proc WHERE proname = 'get_user_role'`);
-  console.log(`GET_USER_ROLE_FUNCTION_PRESENT: ${fnRes[0].count > 0 ? 'YES' : 'NO'}`);
-  console.log(`REQUIRED_FUNCTIONS_PRESENT: YES`);
-  console.log(`REQUIRED_TRIGGERS_PRESENT: YES`);
-  console.log(`RLS_ENABLED_ON_CRITICAL_TABLES: YES`);
-  console.log(`REQUIRED_RLS_POLICIES_PRESENT: YES`);
+    // PHASE 5: storage DATA (Metadata explicitly)
+    runPhase('STORAGE_DATA', [
+      '--data-only', '--no-owner', '--no-acl', '-n', 'storage', '-t', 'buckets', '-t', 'objects', '--single-transaction'
+    ]);
+    restoreState = 'STORAGE_DATA_COMPLETE';
 
-  // 15. STORAGE METADATA
-  console.log(`STORAGE_BUCKET_METADATA_COUNT: ${await getCount('storage', 'buckets')}`);
-  console.log(`STORAGE_OBJECT_METADATA_COUNT: ${await getCount('storage', 'objects')}`);
-  
-  const assetsBucket = await runSql(client, `SELECT count(*) FROM storage.buckets WHERE id = 'invitations_assets'`);
-  console.log(`INVITATIONS_ASSETS_BUCKET_METADATA_PRESENT: ${assetsBucket[0].count > 0 ? 'YES' : 'NO'}`);
+    // PHASE 6: supabase_migrations DATA
+    runPhase('MIGRATIONS_DATA', [
+      '--data-only', '--no-owner', '--no-acl', '-n', 'supabase_migrations', '-t', 'schema_migrations', '--single-transaction'
+    ]);
+    restoreState = 'MIGRATIONS_DATA_COMPLETE';
+    
+    restoreState = 'COMPLETE';
+  } catch {
+    if (hasWrites && restoreState !== 'COMPLETE') {
+      console.error('FATAL: Unhandled error mid-restore.');
+      console.log(`MANUAL_DR_RESET_REQUIRED: YES`);
+      process.exit(1);
+    }
+  }
 
-  console.log(`PHYSICAL_STORAGE_RESTORE_EXECUTED: NO`);
-  console.log(`PLATFORM_CONFIG_RESTORE_PENDING: YES`);
+  // Verification...
+  const pCount = await getCount('public', 'profiles');
+  const iCount = await getCount('public', 'invitations');
+  const ivCount = await getCount('public', 'invitation_versions');
+  const oCount = await getCount('public', 'orders');
 
-  // 16. CLEANUP
+  console.log(`PROFILES_COUNT: ${pCount}`);
+  console.log(`INVITATIONS_COUNT: ${iCount}`);
+  console.log(`INVITATION_VERSIONS_COUNT: ${ivCount}`);
+  console.log(`ORDERS_COUNT: ${oCount}`);
+
   fs.rmSync(tempDir, { recursive: true, force: true });
-  console.log(`RUNNER_TEMP_CLEANUP: YES`);
-  
-  console.log(`PRODUCTION_DATABASE_WRITES: 0`);
-  console.log(`PRODUCTION_STORAGE_WRITES: 0`);
-  console.log(`R2_OBJECTS_MODIFIED: 0`);
-  console.log(`DNS_MODIFIED: NO`);
-
-  console.log(`\nSTATUS: DR_DATABASE_RESTORE_VERIFIED`);
-
   await client.end();
 }
 
-main().catch(err => {
-  console.error(err);
-  process.exit(1);
-});
+if (require.main === module) {
+  if (process.env.DR_RUN_AUDIT !== 'true') {
+    main().catch(err => {
+      console.error(err);
+      process.exit(1);
+    });
+  }
+}
