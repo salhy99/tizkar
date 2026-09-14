@@ -2,6 +2,16 @@ import { assertIsolatedEnvironment } from '../scripts/dr-environment-guard';
 import assert from 'node:assert';
 import { execSync } from 'node:child_process';
 
+interface ExecSyncError extends Error {
+  status: number | null;
+  stderr: Buffer | string;
+  stdout: Buffer | string;
+}
+
+function isExecSyncError(err: unknown): err is ExecSyncError {
+  return err instanceof Error && 'status' in err && 'stderr' in err && 'stdout' in err;
+}
+
 describe('Disaster Recovery Environment Guard', () => {
   let originalEnv: NodeJS.ProcessEnv;
 
@@ -113,5 +123,47 @@ describe('DR Evidence Generation Format', () => {
       STORAGE_RESTORE_RESULT: 'PASS'
     };
     assert.strictEqual(evidence.STORAGE_RESTORE_RESULT, 'PASS');
+  });
+});
+
+describe('DR Backup Verify Script Contract', () => {
+  it('fails closed when missing R2 credentials', () => {
+    try {
+      execSync('npx tsx scripts/dr-backup-verify.ts', {
+        env: { ...process.env, BACKUP_S3_ENDPOINT: '' },
+        stdio: 'pipe'
+      });
+      assert.fail('Should have thrown');
+    } catch (err: unknown) {
+      if (isExecSyncError(err)) {
+        assert.strictEqual(err.status, 1);
+        assert.match(err.stderr.toString() + err.stdout.toString(), /FATAL: Missing read-only R2 credentials\./);
+      } else {
+        throw err;
+      }
+    }
+  });
+
+  it('fails closed when bucket is not tizkar-storage-backup', () => {
+    try {
+      execSync('npx tsx scripts/dr-backup-verify.ts', {
+        env: {
+          ...process.env,
+          BACKUP_S3_ENDPOINT: 'https://s3.example.com',
+          BACKUP_S3_ACCESS_KEY_ID: 'abc',
+          BACKUP_S3_SECRET_ACCESS_KEY: '123',
+          BACKUP_S3_BUCKET: 'wrong-bucket'
+        },
+        stdio: 'pipe'
+      });
+      assert.fail('Should have thrown');
+    } catch (err: unknown) {
+      if (isExecSyncError(err)) {
+        assert.strictEqual(err.status, 1);
+        assert.match(err.stderr.toString() + err.stdout.toString(), /FATAL: Unexpected backup bucket/);
+      } else {
+        throw err;
+      }
+    }
   });
 });
