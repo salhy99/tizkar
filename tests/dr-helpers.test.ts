@@ -1,6 +1,8 @@
 import { assertIsolatedEnvironment } from '../scripts/dr-environment-guard';
 import assert from 'node:assert';
 import { execSync } from 'node:child_process';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 
 interface ExecSyncError extends Error {
   status: number | null;
@@ -168,8 +170,6 @@ describe('DR Backup Verify Script Contract', () => {
   }, 15000);
 
   it('fails closed when pg_restore version is not 17', () => {
-    const fs = require('fs');
-    const path = require('path');
     const tempBin = fs.mkdtempSync(path.join(process.cwd(), 'dr-test-bin-'));
     const isWin = process.platform === 'win32';
     const fakePgRestore = path.join(tempBin, isWin ? 'pg_restore.cmd' : 'pg_restore');
