@@ -34,16 +34,8 @@ export function verifyTargetIdentity(dbUrl: string): boolean {
     return false;
   }
   
-  let parsedUrl: URL;
-  try {
-    parsedUrl = new URL(dbUrl);
-  } catch {
-    console.error('FATAL: Invalid URL format.');
-    return false;
-  }
-  
   const expectedRef = 'hlhrqvmmvczmvyxszzxd';
-  const isLocalDrill = dbUrl.includes('127.0.0.1') && parsedUrl.pathname.includes('tizkar_restore_drill');
+  const isLocalDrill = dbUrl.includes('127.0.0.1') && dbUrl.includes('tizkar_restore_drill');
   
   let signal1 = false;
   let signal2 = false;
@@ -58,8 +50,26 @@ export function verifyTargetIdentity(dbUrl: string): boolean {
       signal1 = true;
     }
     
-    // SIGNAL 2: Database binding contains project ref (Username for pooler, or hostname for direct)
-    if (parsedUrl.username.includes(expectedRef) || parsedUrl.hostname.includes(expectedRef)) {
+    // SIGNAL 2: Database binding contains project ref
+    let username = '';
+    let hostname = '';
+    try {
+      const parsedUrl = new URL(dbUrl);
+      username = parsedUrl.username;
+      hostname = parsedUrl.hostname;
+    } catch {
+      // Fallback for unencoded passwords causing URL parser failure
+      const match = dbUrl.match(/^(?:postgres|postgresql):\/\/([^:]+):.*@([^:/]+)/);
+      if (match) {
+        username = match[1];
+        hostname = match[2];
+      } else {
+        console.error('FATAL: DR_SUPABASE_DB_URL has invalid URL syntax.');
+        return false;
+      }
+    }
+
+    if (username.includes(expectedRef) || hostname.includes(expectedRef)) {
       signal2 = true;
     }
   }

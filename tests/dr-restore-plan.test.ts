@@ -34,6 +34,40 @@ describe('DR Restore Plan Guard Tests', () => {
       const result = verifyTargetIdentity(dbUrl);
       expect(result).toBe(true);
     });
+
+    it('rejects wrong DR project ref', () => {
+      process.env.DR_SUPABASE_URL = 'https://wrongproject.supabase.co';
+      const dbUrl = 'postgresql://postgres.wrongproject:password@aws-0-eu-central-1.pooler.supabase.com:6543/postgres';
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const result = verifyTargetIdentity(dbUrl);
+      expect(result).toBe(false);
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('handles postgres:// DB URL without throwing', () => {
+      process.env.DR_SUPABASE_URL = 'https://hlhrqvmmvczmvyxszzxd.supabase.co';
+      const dbUrl = 'postgres://postgres.hlhrqvmmvczmvyxszzxd:password@aws-0-eu-central-1.pooler.supabase.com:6543/postgres';
+      const result = verifyTargetIdentity(dbUrl);
+      expect(result).toBe(true);
+    });
+
+    it('handles encoded DB password falling back to regex without throwing', () => {
+      process.env.DR_SUPABASE_URL = 'https://hlhrqvmmvczmvyxszzxd.supabase.co';
+      // URL constructor might throw if password contains illegal unencoded characters
+      const dbUrl = 'postgresql://postgres.hlhrqvmmvczmvyxszzxd:pass[word]@aws-0-eu-central-1.pooler.supabase.com:6543/postgres';
+      const result = verifyTargetIdentity(dbUrl);
+      expect(result).toBe(true);
+    });
+
+    it('rejects completely malformed DB URL safely', () => {
+      process.env.DR_SUPABASE_URL = 'https://hlhrqvmmvczmvyxszzxd.supabase.co';
+      const dbUrl = 'not-a-url';
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const result = verifyTargetIdentity(dbUrl);
+      expect(result).toBe(false);
+      expect(consoleErrorSpy).toHaveBeenCalledWith('FATAL: DR_SUPABASE_DB_URL has invalid URL syntax.');
+      consoleErrorSpy.mockRestore();
+    });
   });
 
   describe('B. Public Target Clean Gate', () => {
