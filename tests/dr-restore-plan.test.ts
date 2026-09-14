@@ -44,6 +44,24 @@ describe('DR Restore Plan Guard Tests', () => {
       consoleErrorSpy.mockRestore();
     });
 
+    it('rejects Production project ref', () => {
+      process.env.DR_SUPABASE_URL = 'https://hnjfxdyterpbmkisaiiw.supabase.co';
+      const dbUrl = 'postgresql://postgres.hnjfxdyterpbmkisaiiw:password@aws-0-eu-central-1.pooler.supabase.com:6543/postgres';
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const result = verifyTargetIdentity(dbUrl);
+      expect(result).toBe(false);
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('rejects Development project ref', () => {
+      process.env.DR_SUPABASE_URL = 'https://zxrzqyvlydsdczngxxst.supabase.co';
+      const dbUrl = 'postgresql://postgres.zxrzqyvlydsdczngxxst:password@aws-0-eu-central-1.pooler.supabase.com:6543/postgres';
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const result = verifyTargetIdentity(dbUrl);
+      expect(result).toBe(false);
+      consoleErrorSpy.mockRestore();
+    });
+
     it('handles postgres:// DB URL without throwing', () => {
       process.env.DR_SUPABASE_URL = 'https://hlhrqvmmvczmvyxszzxd.supabase.co';
       const dbUrl = 'postgres://postgres.hlhrqvmmvczmvyxszzxd:password@aws-0-eu-central-1.pooler.supabase.com:6543/postgres';
@@ -51,10 +69,20 @@ describe('DR Restore Plan Guard Tests', () => {
       expect(result).toBe(true);
     });
 
-    it('handles encoded DB password falling back to regex without throwing', () => {
+    it('rejects unencoded DB password with reserved characters safely', () => {
       process.env.DR_SUPABASE_URL = 'https://hlhrqvmmvczmvyxszzxd.supabase.co';
-      // URL constructor might throw if password contains illegal unencoded characters
-      const dbUrl = 'postgresql://postgres.hlhrqvmmvczmvyxszzxd:pass[word]@aws-0-eu-central-1.pooler.supabase.com:6543/postgres';
+      // URL constructor will truncate at unencoded # causing host missing error
+      const dbUrl = 'postgresql://postgres.hlhrqvmmvczmvyxszzxd:pass#word@aws-0-eu-central-1.pooler.supabase.com:6543/postgres';
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const result = verifyTargetIdentity(dbUrl);
+      expect(result).toBe(false);
+      expect(consoleErrorSpy).toHaveBeenCalledWith('FATAL: DR_SUPABASE_DB_URL is not a valid percent-encoded PostgreSQL URI');
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('passes percent-encoded DB password', () => {
+      process.env.DR_SUPABASE_URL = 'https://hlhrqvmmvczmvyxszzxd.supabase.co';
+      const dbUrl = 'postgresql://postgres.hlhrqvmmvczmvyxszzxd:pass%5Bword%5D@aws-0-eu-central-1.pooler.supabase.com:6543/postgres';
       const result = verifyTargetIdentity(dbUrl);
       expect(result).toBe(true);
     });
@@ -65,7 +93,7 @@ describe('DR Restore Plan Guard Tests', () => {
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       const result = verifyTargetIdentity(dbUrl);
       expect(result).toBe(false);
-      expect(consoleErrorSpy).toHaveBeenCalledWith('FATAL: DR_SUPABASE_DB_URL has invalid URL syntax.');
+      expect(consoleErrorSpy).toHaveBeenCalledWith('FATAL: DR_SUPABASE_DB_URL is not a valid percent-encoded PostgreSQL URI');
       consoleErrorSpy.mockRestore();
     });
   });

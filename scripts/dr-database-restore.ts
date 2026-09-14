@@ -51,25 +51,20 @@ export function verifyTargetIdentity(dbUrl: string): boolean {
     }
     
     // SIGNAL 2: Database binding contains project ref
-    let username = '';
-    let hostname = '';
+    let parsedUrl: URL;
     try {
-      const parsedUrl = new URL(dbUrl);
-      username = parsedUrl.username;
-      hostname = parsedUrl.hostname;
+      parsedUrl = new URL(dbUrl);
     } catch {
-      // Fallback for unencoded passwords causing URL parser failure
-      const match = dbUrl.match(/^(?:postgres|postgresql):\/\/([^:]+):.*@([^:/]+)/);
-      if (match) {
-        username = match[1];
-        hostname = match[2];
-      } else {
-        console.error('FATAL: DR_SUPABASE_DB_URL has invalid URL syntax.');
-        return false;
-      }
+      console.error('FATAL: DR_SUPABASE_DB_URL is not a valid percent-encoded PostgreSQL URI');
+      return false;
     }
 
-    if (username.includes(expectedRef) || hostname.includes(expectedRef)) {
+    if (parsedUrl.protocol !== 'postgres:' && parsedUrl.protocol !== 'postgresql:') {
+      console.error('FATAL: DR_SUPABASE_DB_URL is not a valid percent-encoded PostgreSQL URI');
+      return false;
+    }
+
+    if (parsedUrl.username.includes(expectedRef) || parsedUrl.hostname.includes(expectedRef)) {
       signal2 = true;
     }
   }
