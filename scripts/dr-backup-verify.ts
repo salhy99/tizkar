@@ -80,8 +80,7 @@ async function main() {
   console.log(`POSTGRES_VERSION_COMPATIBLE: ${pgRestoreMajor === '17' ? 'YES' : 'NO'}`);
 
   if (pgRestoreMajor !== '17') {
-    console.error(`FATAL: PG_RESTORE_CLIENT_VERSION_MISMATCH. Expected 17, got ${pgRestoreMajor}`);
-    process.exit(1);
+    throw new Error('PG_RESTORE_CLIENT_VERSION_MISMATCH');
   }
 
   const s3Client = new S3Client({
@@ -276,7 +275,7 @@ async function main() {
   fs.rmdirSync(tempDir);
   console.log('RUNNER_TEMP_CLEANUP: YES');
 
-  console.log('\nSTATUS: PG17_ABSOLUTE_BINARY_FIX_READY');
+  console.log('\nSTATUS: PG17_REAL_INSTALL_FIX_READY');
 }
 
 main().catch(error => {

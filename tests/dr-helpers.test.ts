@@ -197,13 +197,58 @@ describe('DR Backup Verify Script Contract', () => {
     } catch (err: unknown) {
       if (isExecSyncError(err)) {
         assert.strictEqual(err.status, 1);
-        assert.match(err.stderr.toString() + err.stdout.toString(), /FATAL: PG_RESTORE_CLIENT_VERSION_MISMATCH\. Expected 17, got (14|UNKNOWN)/);
+        assert.match(err.stderr.toString() + err.stdout.toString(), /Error: PG_RESTORE_CLIENT_VERSION_MISMATCH/);
       } else {
         throw err;
       }
     } finally {
       fs.unlinkSync(fakePgRestore);
       fs.rmdirSync(tempBin);
+    }
+  }, 15000);
+
+  it('PG17 execution cannot be intercepted by PG16 in PATH', () => {
+    const tempBin16 = fs.mkdtempSync(path.join(process.cwd(), 'dr-test-bin16-'));
+    const tempBin17 = fs.mkdtempSync(path.join(process.cwd(), 'dr-test-bin17-'));
+    const isWin = process.platform === 'win32';
+    
+    const fakePgRestore16 = path.join(tempBin16, isWin ? 'pg_restore.cmd' : 'pg_restore');
+    const fakePgRestore17 = path.join(tempBin17, isWin ? 'pg_restore.cmd' : 'pg_restore');
+    
+    if (isWin) {
+      fs.writeFileSync(fakePgRestore16, '@echo off\r\nif "%1"=="--version" (echo pg_restore ^(PostgreSQL^) 16.15) else (exit /b 1)\r\n');
+      fs.writeFileSync(fakePgRestore17, '@echo off\r\nif "%1"=="--version" (echo pg_restore ^(PostgreSQL^) 17.6) else (exit /b 1)\r\n');
+    } else {
+      fs.writeFileSync(fakePgRestore16, '#!/usr/bin/env bash\nif [ "$1" = "--version" ]; then echo "pg_restore (PostgreSQL) 16.15"; else exit 1; fi\n');
+      fs.writeFileSync(fakePgRestore17, '#!/usr/bin/env bash\nif [ "$1" = "--version" ]; then echo "pg_restore (PostgreSQL) 17.6"; else exit 1; fi\n');
+      fs.chmodSync(fakePgRestore16, 0o755);
+      fs.chmodSync(fakePgRestore17, 0o755);
+    }
+
+    try {
+      execSync('npx tsx scripts/dr-backup-verify.ts', {
+        env: {
+          ...process.env,
+          BACKUP_S3_ENDPOINT: 'https://s3.example.com',
+          BACKUP_S3_ACCESS_KEY_ID: 'abc',
+          BACKUP_S3_SECRET_ACCESS_KEY: '123',
+          BACKUP_S3_BUCKET: 'tizkar-storage-backup',
+          PATH: `${tempBin16}${path.delimiter}${process.env.PATH}`,
+          PG_RESTORE_BIN: fakePgRestore17
+        },
+        stdio: 'pipe'
+      });
+      // Should fail eventually on AWS S3 fetch because we used fake secrets
+      assert.fail('Should have thrown on S3 fetch');
+    } catch (err: unknown) {
+      if (isExecSyncError(err)) {
+        // Assert that the version check passed with 17, and it didn't use 16 from PATH
+        const output = err.stderr.toString() + err.stdout.toString();
+        assert.match(output, /PG_RESTORE_CLIENT_MAJOR_VERSION: 17/);
+        assert.doesNotMatch(output, /PG_RESTORE_CLIENT_VERSION_MISMATCH/);
+      } else {
+        throw err;
+      }
     }
   }, 15000);
 });
