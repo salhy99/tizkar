@@ -171,9 +171,15 @@ describe('DR Backup Verify Script Contract', () => {
     const fs = require('fs');
     const path = require('path');
     const tempBin = fs.mkdtempSync(path.join(process.cwd(), 'dr-test-bin-'));
-    const fakePgRestore = path.join(tempBin, 'pg_restore');
-    fs.writeFileSync(fakePgRestore, '#!/usr/bin/env bash\nif [ "$1" = "--version" ]; then echo "pg_restore (PostgreSQL) 14.10"; else exit 1; fi\n');
-    fs.chmodSync(fakePgRestore, 0o755);
+    const isWin = process.platform === 'win32';
+    const fakePgRestore = path.join(tempBin, isWin ? 'pg_restore.cmd' : 'pg_restore');
+    
+    if (isWin) {
+      fs.writeFileSync(fakePgRestore, '@echo off\r\nif "%1"=="--version" (echo pg_restore ^(PostgreSQL^) 14.10) else (exit /b 1)\r\n');
+    } else {
+      fs.writeFileSync(fakePgRestore, '#!/usr/bin/env bash\nif [ "$1" = "--version" ]; then echo "pg_restore (PostgreSQL) 14.10"; else exit 1; fi\n');
+      fs.chmodSync(fakePgRestore, 0o755);
+    }
 
     try {
       execSync('npx tsx scripts/dr-backup-verify.ts', {
@@ -183,7 +189,7 @@ describe('DR Backup Verify Script Contract', () => {
           BACKUP_S3_ACCESS_KEY_ID: 'abc',
           BACKUP_S3_SECRET_ACCESS_KEY: '123',
           BACKUP_S3_BUCKET: 'tizkar-storage-backup',
-          PATH: `${tempBin}:${process.env.PATH}`
+          PG_RESTORE_BIN: fakePgRestore
         },
         stdio: 'pipe'
       });

@@ -44,32 +44,33 @@ async function main() {
   console.log('BACKUP_SOURCE_ACCESS: R2 (READ_ONLY)');
   console.log(`BACKUP_BUCKET: ${bucket}`);
 
-  let resolvedPath = '';
-  try {
-    resolvedPath = execSync('command -v pg_restore', { encoding: 'utf-8' }).trim();
-  } catch {}
+  const PG_RESTORE_BIN = process.env.PG_RESTORE_BIN || '/usr/lib/postgresql/17/bin/pg_restore';
+  const PSQL_BIN = process.env.PSQL_BIN || '/usr/lib/postgresql/17/bin/psql';
 
-  let resolvedVersion = '';
+  let pgRestoreRuntimeVersion = '';
   try {
-    resolvedVersion = execSync('pg_restore --version', { encoding: 'utf-8' }).trim();
-  } catch {}
+    pgRestoreRuntimeVersion = execSync(`"${PG_RESTORE_BIN}" --version`, { encoding: 'utf-8' }).trim();
+  } catch {
+    console.error(`FATAL: Could not execute pg_restore at ${PG_RESTORE_BIN}`);
+    process.exit(1);
+  }
 
-  let pg17RestoreBinaryPresent = false;
-  let pg17RestoreVersion = '';
+  let psqlRuntimeVersion = '';
   try {
-    pg17RestoreVersion = execSync('/usr/lib/postgresql/17/bin/pg_restore --version', { encoding: 'utf-8' }).trim();
-    pg17RestoreBinaryPresent = true;
-  } catch {}
+    psqlRuntimeVersion = execSync(`"${PSQL_BIN}" --version`, { encoding: 'utf-8' }).trim();
+  } catch {
+    psqlRuntimeVersion = 'UNKNOWN';
+  }
 
-  console.log(`PG_RESTORE_RESOLVED_PATH: ${resolvedPath || 'UNKNOWN'}`);
-  console.log(`PG_RESTORE_RESOLVED_VERSION: ${resolvedVersion || 'UNKNOWN'}`);
-  console.log(`PG17_RESTORE_BINARY_PRESENT: ${pg17RestoreBinaryPresent ? 'YES' : 'NO'}`);
-  console.log(`PG17_RESTORE_VERSION: ${pg17RestoreVersion || 'UNKNOWN'}`);
+  console.log(`PG_RESTORE_RUNTIME_PATH: ${PG_RESTORE_BIN}`);
+  console.log(`PG_RESTORE_RUNTIME_VERSION: ${pgRestoreRuntimeVersion}`);
+  console.log(`PSQL_RUNTIME_PATH: ${PSQL_BIN}`);
+  console.log(`PSQL_RUNTIME_VERSION: ${psqlRuntimeVersion}`);
 
   console.log(`BACKUP_PRODUCER_PG_DUMP_VERSION: 17`);
   console.log(`BACKUP_ARCHIVE_HEADER_VERSION: 1.16`);
 
-  const pgRestoreVersionMatch = resolvedVersion.match(/pg_restore \(PostgreSQL\) (\d+\.\d+)/);
+  const pgRestoreVersionMatch = pgRestoreRuntimeVersion.match(/pg_restore \(PostgreSQL\) (\d+\.\d+)/);
   const pgRestoreMajor = pgRestoreVersionMatch ? pgRestoreVersionMatch[1].split('.')[0] : 'UNKNOWN';
 
   console.log(`PG_RESTORE_CLIENT_MAJOR_VERSION: ${pgRestoreMajor}`);
@@ -77,7 +78,6 @@ async function main() {
   console.log(`DR_SERVER_MAJOR_VERSION: 17.6`);
   console.log(`PG_RESTORE_CLIENT_VERSION_MATCH: ${pgRestoreMajor === '17' ? 'YES' : 'NO'}`);
   console.log(`POSTGRES_VERSION_COMPATIBLE: ${pgRestoreMajor === '17' ? 'YES' : 'NO'}`);
-  console.log(`PATH_FIX_IMPLEMENTED: YES`);
 
   if (pgRestoreMajor !== '17') {
     console.error(`FATAL: PG_RESTORE_CLIENT_VERSION_MISMATCH. Expected 17, got ${pgRestoreMajor}`);
@@ -218,7 +218,7 @@ async function main() {
   try {
     console.log(`[Verify] Running pg_restore --list to verify format...`);
     // Ensure we do NOT pass a database URL to prevent accidental restore
-    tocOutput = execSync(`pg_restore --list "${dumpPath}"`, { encoding: 'utf-8' });
+    tocOutput = execSync(`"${PG_RESTORE_BIN}" --list "${dumpPath}"`, { encoding: 'utf-8' });
   } catch (err: unknown) {
     let stderr = '';
     if (isProcessErrorLike(err) && typeof err.stderr === 'string') {
