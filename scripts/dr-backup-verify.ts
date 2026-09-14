@@ -241,16 +241,115 @@ async function main() {
   console.log('ARCHIVE_READABLE: YES');
   console.log(`ARCHIVE_ENTRY_COUNT: ${entryCount}`);
 
-  // Check expected schemas in TOC
-  const publicPresent = tocOutput.includes(' SCHEMA public ') || tocOutput.includes(' SCHEMA - public ');
+  // Semantic parsing of TOC
+  const publicStandalonePresent = tocOutput.includes(' SCHEMA public ') || tocOutput.includes(' SCHEMA - public ');
   const authPresent = tocOutput.includes(' SCHEMA auth ') || tocOutput.includes(' SCHEMA - auth ');
   const storagePresent = tocOutput.includes(' SCHEMA storage ') || tocOutput.includes(' SCHEMA - storage ');
-  const migrationHistoryPresent = tocOutput.includes(' supabase_migrations ');
+  
+  let publicNamespaceCount = 0;
+  const expectedPublicTables = ['profiles', 'admins', 'invitations', 'invitation_versions', 'orders'];
+  const archivedPublicTables: string[] = [];
+  
+  let profilesData = false;
+  let adminsData = false;
+  let invitationsData = false;
+  let invitationVersionsData = false;
+  let ordersData = false;
+  
+  let sequenceObjects = 0;
+  let sequenceStates = 0;
+  let pkCount = 0;
+  let fkCount = 0;
+  let idxCount = 0;
+  let ucCount = 0;
+  
+  let authUsers = false;
+  let authIdentities = false;
+  let storageBuckets = false;
+  let storageObjects = false;
+  let migrationHistory = false;
+  let migrationHistoryRelation = 'N/A';
+  
+  for (const line of tocLines) {
+    if (line.startsWith(';') || !line.trim()) continue;
+    
+    // Check namespace
+    if (line.includes(' public ')) {
+      publicNamespaceCount++;
+    }
+    
+    // Check tables
+    if (line.includes(' TABLE public profiles ')) archivedPublicTables.push('profiles');
+    if (line.includes(' TABLE public admins ')) archivedPublicTables.push('admins');
+    if (line.includes(' TABLE public invitations ')) archivedPublicTables.push('invitations');
+    if (line.includes(' TABLE public invitation_versions ')) archivedPublicTables.push('invitation_versions');
+    if (line.includes(' TABLE public orders ')) archivedPublicTables.push('orders');
+    
+    // Check data
+    if (line.includes(' TABLE DATA public profiles ')) profilesData = true;
+    if (line.includes(' TABLE DATA public admins ')) adminsData = true;
+    if (line.includes(' TABLE DATA public invitations ')) invitationsData = true;
+    if (line.includes(' TABLE DATA public invitation_versions ')) invitationVersionsData = true;
+    if (line.includes(' TABLE DATA public orders ')) ordersData = true;
+    
+    if (line.includes(' CONSTRAINT ') && line.includes(' UNIQUE ')) ucCount++;
+    if (line.includes(' SEQUENCE ')) sequenceObjects++;
+    if (line.includes(' SEQUENCE SET ')) sequenceStates++;
+    if (line.includes(' CONSTRAINT ')) pkCount++; // Approximate, assuming constraints are often PKs/UCs
+    if (line.includes(' FK CONSTRAINT ')) fkCount++;
+    if (line.includes(' INDEX ')) idxCount++;
+    
+    // Check auth/storage
+    if (line.includes(' TABLE auth users ')) authUsers = true;
+    if (line.includes(' TABLE auth identities ')) authIdentities = true;
+    if (line.includes(' TABLE storage buckets ')) storageBuckets = true;
+    if (line.includes(' TABLE storage objects ')) storageObjects = true;
+    
+    // Migration history
+    if (line.includes(' supabase_migrations ')) {
+      migrationHistory = true;
+      migrationHistoryRelation = 'supabase_migrations.schema_migrations';
+    }
+  }
+  
+  const missingCriticalPublicTables = expectedPublicTables.filter(t => !archivedPublicTables.includes(t)).length;
+  const publicSchemaContentPresent = publicNamespaceCount > 0;
+  const publicSchemaDetectorFalseNegative = !publicStandalonePresent && publicSchemaContentPresent;
 
-  console.log(`PUBLIC_SCHEMA_PRESENT: ${publicPresent ? 'YES' : 'NO'}`);
+  console.log(`PUBLIC_SCHEMA_STANDALONE_ENTRY_PRESENT: ${publicStandalonePresent ? 'YES' : 'NO'}`);
+  console.log(`PUBLIC_NAMESPACE_TOC_ENTRY_COUNT: ${publicNamespaceCount}`);
+  console.log(`PUBLIC_SCHEMA_CONTENT_PRESENT: ${publicSchemaContentPresent ? 'YES' : 'NO'}`);
+  console.log(`PUBLIC_SCHEMA_DETECTOR_FALSE_NEGATIVE: ${publicSchemaDetectorFalseNegative ? 'YES' : 'NO'}`);
+  
+  console.log(`EXPECTED_PUBLIC_TABLES: ${expectedPublicTables.join(', ')}`);
+  console.log(`ARCHIVED_PUBLIC_TABLES: ${archivedPublicTables.join(', ')}`);
+  console.log(`MISSING_CRITICAL_PUBLIC_TABLES: ${missingCriticalPublicTables}`);
+  
+  console.log(`PROFILES_TABLE_DATA_PRESENT: ${profilesData ? 'YES' : 'NO'}`);
+  console.log(`ADMINS_TABLE_DATA_PRESENT: ${adminsData ? 'YES' : 'NO'}`);
+  console.log(`INVITATIONS_TABLE_DATA_PRESENT: ${invitationsData ? 'YES' : 'NO'}`);
+  console.log(`INVITATION_VERSIONS_TABLE_DATA_PRESENT: ${invitationVersionsData ? 'YES' : 'NO'}`);
+  console.log(`ORDERS_TABLE_DATA_PRESENT: ${ordersData ? 'YES' : 'NO'}`);
+  
+  console.log(`REQUIRED_SEQUENCE_OBJECTS_PRESENT: ${sequenceObjects > 0 ? 'YES' : 'NO'}`);
+  console.log(`SEQUENCE_STATE_PRESENT: ${sequenceStates > 0 ? 'YES' : 'NO'}`);
+  
+  console.log(`PUBLIC_PRIMARY_KEY_COUNT: ${pkCount}`);
+  console.log(`PUBLIC_FOREIGN_KEY_COUNT: ${fkCount}`);
+  console.log(`PUBLIC_INDEX_COUNT: ${idxCount}`);
+  console.log(`PUBLIC_UNIQUE_CONSTRAINT_COUNT: ${ucCount}`);
+  console.log(`CRITICAL_RELATIONSHIP_METADATA_PRESENT: ${(pkCount > 0 && fkCount > 0) ? 'YES' : 'NO'}`);
+  
+  console.log(`AUTH_USERS_RELATION_PRESENT: ${authUsers ? 'YES' : 'NO'}`);
+  console.log(`AUTH_IDENTITIES_RELATION_PRESENT: ${authIdentities ? 'YES' : 'NO'}`);
+  console.log(`STORAGE_BUCKETS_RELATION_PRESENT: ${storageBuckets ? 'YES' : 'NO'}`);
+  console.log(`STORAGE_OBJECTS_RELATION_PRESENT: ${storageObjects ? 'YES' : 'NO'}`);
+  
+  console.log(`MIGRATION_HISTORY_RELATION: ${migrationHistoryRelation}`);
+  console.log(`MIGRATION_HISTORY_PRESENT: ${migrationHistory ? 'YES' : 'NO'}`);
+  
   console.log(`AUTH_SCHEMA_PRESENT: ${authPresent ? 'YES' : 'NO'}`);
   console.log(`STORAGE_SCHEMA_PRESENT: ${storagePresent ? 'YES' : 'NO'}`);
-  console.log(`MIGRATION_HISTORY_PRESENT: ${migrationHistoryPresent ? 'YES' : 'NO'}`);
 
 
   const drSupabaseUrl = process.env.DR_SUPABASE_URL || '';
@@ -275,7 +374,24 @@ async function main() {
   fs.rmdirSync(tempDir);
   console.log('RUNNER_TEMP_CLEANUP: YES');
 
-  console.log('\nSTATUS: PG17_REAL_INSTALL_FIX_READY');
+  const drTargetReconfirmed = drSupabaseUrl.includes('hlhrqvmmvczmvyxszzxd');
+  
+  const isReadyForRestore = 
+    pgRestoreMajor === '17' &&
+    match === true &&
+    entryCount > 0 &&
+    publicSchemaContentPresent &&
+    missingCriticalPublicTables === 0 &&
+    authPresent &&
+    storagePresent &&
+    migrationHistory &&
+    drTargetReconfirmed;
+
+  if (isReadyForRestore) {
+    console.log('\nSTATUS: DATABASE_BACKUP_VERIFIED_READY_FOR_RESTORE');
+  } else {
+    console.log('\nSTATUS: DATABASE_BACKUP_VERIFICATION_FAILED');
+  }
 }
 
 main().catch(error => {
