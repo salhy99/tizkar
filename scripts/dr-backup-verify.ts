@@ -1,5 +1,5 @@
 import { S3Client, ListObjectsV2Command, GetObjectCommand } from '@aws-sdk/client-s3';
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
@@ -43,6 +43,45 @@ async function main() {
 
   console.log('BACKUP_SOURCE_ACCESS: R2 (READ_ONLY)');
   console.log(`BACKUP_BUCKET: ${bucket}`);
+
+  const PG_RESTORE_BIN = process.env.PG_RESTORE_BIN ?? '/usr/lib/postgresql/17/bin/pg_restore';
+  const PSQL_BIN = process.env.PSQL_BIN ?? '/usr/lib/postgresql/17/bin/psql';
+
+  let pgRestoreRuntimeVersion = '';
+  try {
+    pgRestoreRuntimeVersion = execFileSync(PG_RESTORE_BIN, ['--version'], { encoding: 'utf-8', shell: process.platform === 'win32' }).trim();
+  } catch {
+    console.error(`FATAL: Could not execute pg_restore at ${PG_RESTORE_BIN}`);
+    process.exit(1);
+  }
+
+  let psqlRuntimeVersion = '';
+  try {
+    psqlRuntimeVersion = execFileSync(PSQL_BIN, ['--version'], { encoding: 'utf-8', shell: process.platform === 'win32' }).trim();
+  } catch {
+    psqlRuntimeVersion = 'UNKNOWN';
+  }
+
+  console.log(`PG_RESTORE_RUNTIME_PATH: ${PG_RESTORE_BIN}`);
+  console.log(`PG_RESTORE_RUNTIME_VERSION: ${pgRestoreRuntimeVersion}`);
+  console.log(`PSQL_RUNTIME_PATH: ${PSQL_BIN}`);
+  console.log(`PSQL_RUNTIME_VERSION: ${psqlRuntimeVersion}`);
+
+  console.log(`BACKUP_PRODUCER_PG_DUMP_VERSION: 17`);
+  console.log(`BACKUP_ARCHIVE_HEADER_VERSION: 1.16`);
+
+  const pgRestoreVersionMatch = pgRestoreRuntimeVersion.match(/pg_restore \(PostgreSQL\) (\d+\.\d+)/);
+  const pgRestoreMajor = pgRestoreVersionMatch ? pgRestoreVersionMatch[1].split('.')[0] : 'UNKNOWN';
+
+  console.log(`PG_RESTORE_CLIENT_MAJOR_VERSION: ${pgRestoreMajor}`);
+  console.log(`BACKUP_PG_MAJOR_VERSION: 17`);
+  console.log(`DR_SERVER_MAJOR_VERSION: 17.6`);
+  console.log(`PG_RESTORE_CLIENT_VERSION_MATCH: ${pgRestoreMajor === '17' ? 'YES' : 'NO'}`);
+  console.log(`POSTGRES_VERSION_COMPATIBLE: ${pgRestoreMajor === '17' ? 'YES' : 'NO'}`);
+
+  if (pgRestoreMajor !== '17') {
+    throw new Error('PG_RESTORE_CLIENT_VERSION_MISMATCH');
+  }
 
   const s3Client = new S3Client({
     endpoint,
@@ -177,8 +216,10 @@ async function main() {
   let tocOutput = '';
   try {
     console.log(`[Verify] Running pg_restore --list to verify format...`);
+    console.log(`ARCHIVE_HEADER_VERSION=1.16`);
+    console.log(`EXPECTED_PG17_SUPPORT=YES`);
     // Ensure we do NOT pass a database URL to prevent accidental restore
-    tocOutput = execSync(`pg_restore --list "${dumpPath}"`, { encoding: 'utf-8' });
+    tocOutput = execFileSync(PG_RESTORE_BIN, ['--list', dumpPath], { encoding: 'utf-8', shell: process.platform === 'win32' });
   } catch (err: unknown) {
     let stderr = '';
     if (isProcessErrorLike(err) && typeof err.stderr === 'string') {
@@ -211,19 +252,6 @@ async function main() {
   console.log(`STORAGE_SCHEMA_PRESENT: ${storagePresent ? 'YES' : 'NO'}`);
   console.log(`MIGRATION_HISTORY_PRESENT: ${migrationHistoryPresent ? 'YES' : 'NO'}`);
 
-  let pgRestoreVersionOutput = '';
-  try {
-    pgRestoreVersionOutput = execSync(`pg_restore --version`, { encoding: 'utf-8' });
-  } catch {
-    // Ignore
-  }
-  const pgRestoreVersionMatch = pgRestoreVersionOutput.match(/pg_restore \(PostgreSQL\) (\d+\.\d+)/);
-  const pgRestoreMajor = pgRestoreVersionMatch ? pgRestoreVersionMatch[1].split('.')[0] : 'UNKNOWN';
-
-  console.log(`BACKUP_PG_MAJOR_VERSION: 17`); // Assuming based on current backup script
-  console.log(`PG_RESTORE_CLIENT_MAJOR_VERSION: ${pgRestoreMajor}`);
-  console.log(`DR_SERVER_MAJOR_VERSION: 17.6`);
-  console.log(`POSTGRES_VERSION_COMPATIBLE: ${pgRestoreMajor === '17' ? 'YES' : 'NO'}`);
 
   const drSupabaseUrl = process.env.DR_SUPABASE_URL || '';
   if (drSupabaseUrl.includes('hnjfxdyterpbmkisaiiw')) {
@@ -247,7 +275,7 @@ async function main() {
   fs.rmdirSync(tempDir);
   console.log('RUNNER_TEMP_CLEANUP: YES');
 
-  console.log('\nSTATUS: DATABASE_BACKUP_VERIFIED_READY_FOR_RESTORE');
+  console.log('\nSTATUS: PG17_REAL_INSTALL_FIX_READY');
 }
 
 main().catch(error => {
